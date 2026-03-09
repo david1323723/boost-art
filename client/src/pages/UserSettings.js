@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import axios from '../api';
 import './UserSettings.css';
 
 const UserSettings = () => {
@@ -55,19 +56,12 @@ const UserSettings = () => {
     }
 
     try {
-      const response = await fetch('/api/users/password', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        })
+      const response = await axios.put('/api/users/password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
       });
 
-      const data = await response.json();
+      const data = response.data;
 
       if (data.message) {
         setMessage({ type: 'success', text: data.message });

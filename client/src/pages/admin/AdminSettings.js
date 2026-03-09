@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import axios from '../../api';
 import './AdminSettings.css';
 
 const AdminSettings = () => {
@@ -67,16 +68,8 @@ const AdminSettings = () => {
     }
 
     try {
-      const response = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        },
-        body: JSON.stringify(updateData)
-      });
-
-      const data = await response.json();
+      const response = await axios.put('/api/admin/settings', updateData);
+      const data = response.data;
 
       // Handle hardcoded admin case - update localStorage directly
       if (!data.success && data.message === "Cannot update settings for hardcoded admin account") {
