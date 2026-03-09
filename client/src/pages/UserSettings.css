@@ -1,0 +1,130 @@
+
+/* =======================
+   USER SETTINGS - Modern Style with Dark Mode
+   ======================= */
+
+.user-settings-page {
+  padding: var(--spacing-xl) 0;
+  min-height: calc(100vh - 80px);
+}
+
+.settings-container {
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+}
+
+/* Tabs */
+.settings-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+}
+
+.tab-btn:hover {
+  color: var(--primary-color);
+  background: var(--bg-tertiary);
+}
+
+.tab-btn.active {
+  color: var(--primary-color);
+  background: var(--bg-primary);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+}
+
+/* Tab Content */
+.settings-content {
+  padding: var(--spacing-xl);
+}
+
+.tab-panel h3 {
+  margin-bottom: var(--spacing-lg);
+  color: var(--text-primary);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+}
+
+.tab-panel form {
+  max-width: 500px;
+}
+
+/* Input Styles */
+.input-disabled {
+  background: var(--bg-secondary) !important;
+  color: var(--text-tertiary) !important;
+  cursor: not-allowed !important;
+  border-color: var(--border-light) !important;
+}
+
+.help-text {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  margin-top: var(--spacing-xs);
+}
+
+.tab-panel .btn {
+  margin-top: var(--spacing-lg);
+  min-width: 150px;
+}
+
+/* Form Group */
+.tab-panel .form-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Loading State */
+.user-settings-page .loading-container {
+  min-height: 50vh;
+}
+
+/* Alert */
+.user-settings-page .alert {
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .user-settings-page {
+    padding: var(--spacing-lg) 0;
+  }
+
+  .settings-content {
+    padding: var(--spacing-lg);
+  }
+
+  .tab-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+  }
+
+  .settings-tabs {
+    overflow-x: auto;
+  }
+}
+
+
