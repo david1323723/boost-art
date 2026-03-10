@@ -186,7 +186,7 @@ router.put("/profile", adminAuth, async (req, res) => {
     const updatedAdmin = await Admin.findByIdAndUpdate(
       req.admin._id,
       { fullName, avatar },
-      { new: true }
+      { returnDocument: 'after' }
     ).select("-password");
 
     res.json({
@@ -239,11 +239,35 @@ router.put("/settings", adminAuth, async (req, res) => {
     // Get the admin ID - handle both hardcoded and database admins
     const adminId = req.admin._id || req.admin.id;
     
-    // For hardcoded admin, we cannot update in the database
+    // For hardcoded admin, allow username and email updates (stored in localStorage)
     if (!adminId || adminId.startsWith('admin-')) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Cannot update settings for hardcoded admin account" 
+      // Validate inputs for hardcoded admin
+      if (username && username.length < 3) {
+        return res.status(400).json({ success: false, message: "Username must be at least 3 characters" });
+      }
+      
+      if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          return res.status(400).json({ success: false, message: "Invalid email format" });
+        }
+      }
+      
+      if (password && password.length < 6) {
+        return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+      }
+      
+      // Return success with updated data (frontend will handle localStorage)
+      const updatedAdmin = { ...req.admin };
+      
+      if (username) updatedAdmin.username = username;
+      if (email) updatedAdmin.email = email;
+      
+      return res.json({ 
+        success: true, 
+        message: "Admin settings updated successfully",
+        admin: updatedAdmin,
+        isHardcodedAdmin: true
       });
     }
     
@@ -541,7 +565,7 @@ router.put("/messages/:id/read", adminAuth, async (req, res) => {
     const message = await Message.findByIdAndUpdate(
       req.params.id,
       { isRead: true },
-      { new: true }
+      { returnDocument: 'after' }
     );
     
     if (!message) {
@@ -575,7 +599,7 @@ router.post("/messages/:id/reply", adminAuth, async (req, res) => {
           repliedBy: req.admin._id
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!message) {
@@ -586,6 +610,68 @@ router.post("/messages/:id/reply", adminAuth, async (req, res) => {
   } catch (error) {
     console.error("REPLY MESSAGE ERROR:", error);
     res.status(500).json({ message: "Failed to reply to message" });
+  }
+});
+
+// =======================
+// GET UNREAD MESSAGES COUNT (For Notifications)
+// =======================
+router.get("/messages/unread-count", adminAuth, async (req, res) => {
+  try {
+    const count = await Message.countDocuments({ 
+      isRead: false,
+      direction: 'user-to-admin'
+    });
+    res.json({ unreadCount: count });
+  } catch (error) {
+    console.error("GET UNREAD COUNT ERROR:", error);
+    res.status(500).json({ message: "Failed to get unread count" });
+  }
+});
+
+// =======================
+// SEND MESSAGE TO SPECIFIC USER (Admin to User)
+// =======================
+router.post("/messages/to-user", adminAuth, async (req, res) => {
+  try {
+    const { userId, message } = req.body;
+    
+    if (!userId || !message) {
+      return res.status(400).json({ message: "User ID and message are required" });
+    }
+    
+    if (message.trim() === "") {
+      return res.status(400).json({ message: "Message cannot be empty" });
+    }
+    
+    // Get the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Create the message (admin-to-user)
+    const newMessage = new Message({
+      direction: 'admin-to-user',
+      sender: req.admin._id || req.admin.id,
+      senderName: req.admin.fullName || req.admin.username || 'Admin',
+      senderEmail: req.admin.email || 'admin@boostart.com',
+      recipient: userId,
+      recipientName: user.fullName || user.username,
+      recipientEmail: user.email,
+      message: message.trim(),
+      isRead: false
+    });
+    
+    await newMessage.save();
+    
+    res.status(201).json({
+      message: "Message sent successfully",
+      messageData: newMessage
+    });
+  } catch (error) {
+    console.error("SEND TO USER ERROR:", error);
+    res.status(500).json({ message: "Failed to send message" });
   }
 });
 

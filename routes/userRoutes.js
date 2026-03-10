@@ -183,7 +183,7 @@ router.put("/profile", auth, async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
       { fullName, bio, avatar },
-      { new: true }
+      { returnDocument: 'after' }
     ).select("-password");
 
     res.json({
@@ -329,6 +329,7 @@ router.post("/messages", auth, async (req, res) => {
     }
 
     const newMessage = new Message({
+      direction: 'user-to-admin',
       sender: req.user._id,
       senderName: req.user.fullName || req.user.username,
       senderEmail: req.user.email,
@@ -348,16 +349,61 @@ router.post("/messages", auth, async (req, res) => {
 });
 
 // =======================
-// GET USER'S MESSAGES
+// GET USER'S MESSAGES (both sent and received)
 // =======================
 router.get("/messages", auth, async (req, res) => {
   try {
-    const messages = await Message.find({ sender: req.user._id })
-      .sort({ createdAt: -1 });
+    // Get messages where user is sender OR recipient
+    const messages = await Message.find({
+      $or: [
+        { sender: req.user._id },
+        { recipient: req.user._id }
+      ]
+    }).sort({ createdAt: -1 });
     res.json(messages);
   } catch (error) {
     console.error("GET MESSAGES ERROR:", error);
     res.status(500).json({ message: "Failed to fetch messages" });
+  }
+});
+
+// =======================
+// GET UNREAD MESSAGES COUNT (For Notifications - includes admin replies)
+// =======================
+router.get("/messages/unread-count", auth, async (req, res) => {
+  try {
+    // Count messages sent TO this user (admin replies) that are unread
+    const count = await Message.countDocuments({ 
+      recipient: req.user._id,
+      isRead: false,
+      direction: 'admin-to-user'
+    });
+    res.json({ unreadCount: count });
+  } catch (error) {
+    console.error("GET UNREAD COUNT ERROR:", error);
+    res.status(500).json({ message: "Failed to get unread count" });
+  }
+});
+
+// =======================
+// MARK MESSAGE AS READ
+// =======================
+router.put("/messages/:id/read", auth, async (req, res) => {
+  try {
+    const message = await Message.findOneAndUpdate(
+      { _id: req.params.id, recipient: req.user._id },
+      { isRead: true, readAt: new Date() },
+      { returnDocument: 'after' }
+    );
+    
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    res.json({ message: "Message marked as read", messageData: message });
+  } catch (error) {
+    console.error("MARK READ ERROR:", error);
+    res.status(500).json({ message: "Failed to mark message as read" });
   }
 });
 

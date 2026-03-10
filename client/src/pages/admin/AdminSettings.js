@@ -71,37 +71,6 @@ const AdminSettings = () => {
       const response = await axios.put('/api/admin/settings', updateData);
       const data = response.data;
 
-      // Handle hardcoded admin case - update localStorage directly
-      if (!data.success && data.message === "Cannot update settings for hardcoded admin account") {
-        // For hardcoded admin, update localStorage with new credentials
-        const updatedAdmin = { ...admin };
-        
-        if (settingsData.newUsername) {
-          updatedAdmin.username = settingsData.newUsername;
-        }
-        if (settingsData.newEmail) {
-          updatedAdmin.email = settingsData.newEmail;
-        }
-        
-        // Update localStorage
-        localStorage.setItem('admin', JSON.stringify(updatedAdmin));
-        
-        setMessage({ type: 'success', text: 'Settings updated successfully (local mode)' });
-        
-        // Clear the form
-        setSettingsData({
-          newUsername: '',
-          newEmail: '',
-          password: '',
-          confirmPassword: ''
-        });
-        
-        // Reload to apply changes
-        window.location.reload();
-        setLoading(false);
-        return;
-      }
-
       if (data.success) {
         setMessage({ type: 'success', text: data.message });
         
@@ -123,7 +92,8 @@ const AdminSettings = () => {
         setMessage({ type: 'error', text: data.message || 'Failed to update settings' });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update settings' });
+      const errorMessage = error.response?.data?.message || 'Failed to update settings';
+      setMessage({ type: 'error', text: errorMessage });
     }
     setLoading(false);
   };

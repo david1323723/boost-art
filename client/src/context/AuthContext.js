@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import axios from '../api';
 
 const AuthContext = createContext(null);
@@ -17,6 +17,10 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [adminToken, setAdminToken] = useState(localStorage.getItem('adminToken'));
   const [loading, setLoading] = useState(true);
+
+  // Use refs to capture initial token values for the auth check effect
+  const tokenRef = useRef(token);
+  const adminTokenRef = useRef(adminToken);
 
   // Configure axios headers based on which is currently active
   useEffect(() => {
@@ -50,11 +54,15 @@ export const AuthProvider = ({ children }) => {
   // Check if user is logged in on mount
   useEffect(() => {
     const checkAuth = async () => {
+      // Use refs to get the initial token values at mount time
+      const currentToken = tokenRef.current;
+      const currentAdminToken = adminTokenRef.current;
+      
       // Check admin first (higher priority)
-      if (adminToken) {
+      if (currentAdminToken) {
         try {
           // For hardcoded admin token
-          if (adminToken.startsWith('admin-token-')) {
+          if (currentAdminToken.startsWith('admin-token-')) {
             const storedAdmin = localStorage.getItem('admin');
             if (storedAdmin) {
               setAdmin(JSON.parse(storedAdmin));
@@ -73,7 +81,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Then check user
-      if (token) {
+      if (currentToken) {
         try {
           const response = await axios.get('/api/users/profile');
           setUser(response.data);
@@ -86,6 +94,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     };
     checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // User functions
