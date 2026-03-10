@@ -180,6 +180,9 @@ app.post("/api/posts", upload.single("image"), async(req,res)=>{
 
 app.get("/api/posts", async (req, res) => {
   try {
+    // Set caching headers for performance
+    res.set("Cache-Control", "public, max-age=300");
+    
     // Check if collection is empty first for fast response
     const count = await Post.countDocuments();
     
@@ -189,7 +192,9 @@ app.get("/api/posts", async (req, res) => {
     }
     
     // Fetch only latest 10 posts with lean() for better performance
+    // Select only necessary fields to reduce response size
     const posts = await Post.find()
+      .select('title description mediaUrl mediaType category createdAt')
       .sort({ createdAt: -1 })
       .limit(10)
       .lean();
