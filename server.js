@@ -175,27 +175,32 @@ app.post("/api/posts", upload.single("image"), async(req,res)=>{
 });
 
 // =======================
-// GET POSTS
+// GET POSTS (Optimized)
 // =======================
 
-app.get("/api/posts", async(req,res)=>{
-
-  try{
-
-    const posts = await Post.find().sort({createdAt:-1});
-
+app.get("/api/posts", async (req, res) => {
+  try {
+    // Check if collection is empty first for fast response
+    const count = await Post.countDocuments();
+    
+    // Return empty array immediately if no posts
+    if (count === 0) {
+      return res.json([]);
+    }
+    
+    // Fetch only latest 10 posts with lean() for better performance
+    const posts = await Post.find()
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+    
     res.json(posts);
-
-  }catch(error){
-
-    console.error("FETCH ERROR:",error);
-
+  } catch (error) {
+    console.error("FETCH ERROR:", error);
     res.status(500).json({
-      message:"Failed to fetch posts"
+      message: "Failed to fetch posts"
     });
-
   }
-
 });
 
 // =======================
