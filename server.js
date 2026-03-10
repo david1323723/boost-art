@@ -32,7 +32,14 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT ||
 app.use(cors({
   origin: '*',
   methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'multipart/form-data']
+}));
+
+// Handle preflight requests for file uploads
+app.options('*', cors({
+  origin: '*',
+  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'multipart/form-data']
 }));
 
 app.use(express.json({ limit: "10mb" }));
@@ -117,61 +124,84 @@ app.use("/api/users",userRoutes);
 app.use("/api/admin",adminRoutes);
 
 // =======================
-// CREATE POST
+// CREATE POST (Improved error handling)
 // =======================
 
-app.post("/api/posts", upload.single("image"), async(req,res)=>{
+app.post("/api/posts", upload.single("image"), async(req, res)=>{
 
-  try{
+  try {
+    const { title, description, category } = req.body;
 
-    const {title,description,category} = req.body;
-
-    if(!title || !category){
+    // Validate required fields
+    if (!title || !title.trim()) {
       return res.status(400).json({
-        message:"Title and category are required"
+        message: "Title is required"
       });
     }
 
-    if(!req.file){
+    if (!category || !category.trim()) {
       return res.status(400).json({
-        message:"Image or video is required"
+        message: "Category is required"
       });
     }
 
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        message: "Please upload an image or video file"
+      });
+    }
+
+    // Determine media type
     let mediaType = "image";
-
-    if(req.file.mimetype.startsWith("video/")){
+    if (req.file.mimetype.startsWith("video/")) {
       mediaType = "video";
     }
 
+    // Ensure upload directory exists
+    const uploadPath = path.join(__dirname, "uploads");
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
+    // Construct media URL
     const mediaUrl = `${BASE_URL}/uploads/${req.file.filename}`;
 
+    // Create and save post
     const newPost = new Post({
-      title,
-      description,
+      title: title.trim(),
+      description: description ? description.trim() : '',
       mediaUrl,
       mediaType,
-      category
+      category: category.trim()
     });
 
     const savedPost = await newPost.save();
 
+    console.log(`✅ Post created: ${savedPost.title}`);
+
     res.status(201).json({
-      message:"Post created successfully",
-      post:savedPost
+      message: "Post created successfully",
+      post: savedPost
     });
 
-  }catch(error){
-
-    console.error("POST ERROR:",error);
+  } catch (error) {
+    console.error("POST ERROR:", error);
+    
+    // Clean up uploaded file if post creation fails
+    if (req.file) {
+      const filePath = path.join(__dirname, "uploads", req.file.filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log("🗑️ Cleaned up failed upload file");
+      }
+    }
 
     res.status(500).json({
-      message:"Internal server error",
-      error:error.message
+      message: "Failed to create post. Please try again.",
+      error: process.env.NODE_ENV === 'production' ? undefined : error.message
     });
-
   }
-
 });
 
 // =======================

@@ -12,13 +12,20 @@ const { adminAuth, superAdminAuth } = require("../middleware/adminAuth");
 const router = express.Router();
 
 // =======================
+// CONFIG
+// =======================
+
+// Detect base URL automatically
+const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+
+// =======================
 // MULTER SETUP FOR ADMIN
 // =======================
 
 // Storage for images
 const imageStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = "uploads/";
+    const uploadPath = path.join(__dirname, "../uploads");
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -382,7 +389,7 @@ router.post("/posts", adminAuth, upload.single("media"), async (req, res) => {
     let finalMediaType = mediaType || "image";
 
     if (req.file) {
-      mediaUrl = `https://boost-art-backend.onrender.com/uploads/${req.file.filename}`;
+      mediaUrl = `${BASE_URL}/uploads/${req.file.filename}`;
       
       // Determine media type based on mime type
       if (req.file.mimetype.startsWith("video/")) {
@@ -431,9 +438,9 @@ router.put("/posts/:id", adminAuth, upload.single("media"), async (req, res) => 
     if (description !== undefined) post.description = description;
     if (category) post.category = category;
 
-    // Update media if new file uploaded
+// Update media if new file uploaded
     if (req.file) {
-      post.mediaUrl = `https://boost-art-backend.onrender.com/uploads/${req.file.filename}`;
+      post.mediaUrl = `${BASE_URL}/uploads/${req.file.filename}`;
       
       // Determine media type based on mime type
       if (req.file.mimetype.startsWith("video/")) {
