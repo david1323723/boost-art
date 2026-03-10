@@ -382,7 +382,7 @@ router.post("/posts", adminAuth, upload.single("media"), async (req, res) => {
     let finalMediaType = mediaType || "image";
 
     if (req.file) {
-      mediaUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+      mediaUrl = `https://boost-art-backend.onrender.com/uploads/${req.file.filename}`;
       
       // Determine media type based on mime type
       if (req.file.mimetype.startsWith("video/")) {
@@ -433,7 +433,7 @@ router.put("/posts/:id", adminAuth, upload.single("media"), async (req, res) => 
 
     // Update media if new file uploaded
     if (req.file) {
-      post.mediaUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+      post.mediaUrl = `https://boost-art-backend.onrender.com/uploads/${req.file.filename}`;
       
       // Determine media type based on mime type
       if (req.file.mimetype.startsWith("video/")) {

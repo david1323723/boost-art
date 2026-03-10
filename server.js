@@ -124,7 +124,7 @@ app.post("/api/posts", upload.single("image"), async (req, res) => {
     let mediaType = "image";
 
     if (req.file) {
-      mediaUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+      mediaUrl = `https://boost-art-backend.onrender.com/uploads/${req.file.filename}`;
       
       // Determine media type
       if (req.file.mimetype.startsWith("video/")) {
