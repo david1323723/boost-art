@@ -29,7 +29,7 @@ const app = express();
 // =======================
 // CONFIG
 // =======================
-const BASE_URL = process.env.API_BASE_URL || process.env.BASE_URL || 'https://boost-art-backend.onrender.com';
+const BASE_URL = process.env.API_BASE_URL || 'https://boost-art-backend.onrender.com';
 
 // =======================
 // Middleware
