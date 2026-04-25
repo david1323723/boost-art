@@ -405,7 +405,7 @@ router.put("/posts/:postId", adminAuth, upload.single("media"), async (req, res)
         }
       }
 
-      const BASE_URL = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+      const BASE_URL = process.env.API_BASE_URL || 'https://boost-art-backend.onrender.com';
       updateData.mediaUrl = `${BASE_URL}/uploads/${req.file.filename}`;
       updateData.mediaType = req.file.mimetype.startsWith("video/") ? "video" : "image";
     }

@@ -53,9 +53,7 @@ const Messages = () => {
     if (!token || !userIdRef.current) return;
 
     const newSocket = io(
-      process.env.NODE_ENV === 'production'
-        ? 'https://boost-art-api.onrender.com'
-        : 'https://boost-art-backend.onrender.com',
+      'https://boost-art-backend.onrender.com',
       {
         auth: { token },
         reconnection: true,

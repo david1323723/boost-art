@@ -2,9 +2,7 @@ import axios from 'axios';
 
 // Configure axios base URL
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' 
-    ? 'https://boost-art-api.onrender.com/api' 
-    : '/api'
+  baseURL: 'https://boost-art-backend.onrender.com/api'
 });
 
 // Request interceptor: attach token from localStorage
