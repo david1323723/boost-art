@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Post = require("../models/Post");
 const Message = require("../models/Message");
-const { auth, optionalAuth } = require("../middleware/auth");
+const auth = require("../middleware/auth").auth;
 
 const router = express.Router();
 
@@ -59,7 +59,7 @@ router.post("/register", async (req, res) => {
       message: "Registration successful",
       token,
       user: {
-        id: newUser._id,
+        _id: newUser._id,
         username: newUser.username,
         email: newUser.email,
         fullName: newUser.fullName,
@@ -82,35 +82,6 @@ router.post("/login", async (req, res) => {
 
     if (!password) {
       return res.status(400).json({ message: "Password is required" });
-    }
-
-    // Check if this is an admin login request (hardcoded credentials)
-    const ADMIN_USERNAME = 'david';
-    const ADMIN_PASSWORD = '0791323723';
-    
-    // Check if login is with admin credentials
-    const loginId = email || username;
-    if (loginId === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      // Generate admin token
-      const adminToken = jwt.sign(
-        { id: 'admin-001', role: 'admin' },
-        process.env.JWT_SECRET || "boostartsecretkey",
-        { expiresIn: "7d" }
-      );
-
-      return res.json({
-        success: true,
-        message: "Admin login successful",
-        token: adminToken,
-        role: "admin",
-        admin: {
-          id: 'admin-001',
-          username: 'david',
-          email: 'david@boostart.com',
-          fullName: 'David',
-          role: 'admin'
-        }
-      });
     }
 
     // Regular user login - find user by email or username
@@ -146,12 +117,13 @@ router.post("/login", async (req, res) => {
       message: "Login successful",
       token,
       user: {
-        id: user._id,
+        _id: user._id,
         username: user.username,
         email: user.email,
         fullName: user.fullName,
         avatar: user.avatar,
-        bio: user.bio
+        bio: user.bio,
+        isAdmin: user.isAdmin
       }
     });
   } catch (error) {
@@ -174,7 +146,7 @@ router.get("/profile", auth, async (req, res) => {
 });
 
 // =======================
-// UPDATE USER PROFILE
+ // UPDATE USER PROFILE
 // =======================
 router.put("/profile", auth, async (req, res) => {
   try {
@@ -197,7 +169,7 @@ router.put("/profile", auth, async (req, res) => {
 });
 
 // =======================
-// CHANGE PASSWORD
+ // CHANGE PASSWORD
 // =======================
 router.put("/password", auth, async (req, res) => {
   try {
@@ -221,9 +193,9 @@ router.put("/password", auth, async (req, res) => {
 });
 
 // =======================
-// GET ALL POSTS (PUBLIC)
-// =======================
-router.get("/posts", optionalAuth, async (req, res) => {
+ // GET ALL POSTS (PUBLIC)
+ // =======================
+router.get("/posts", async (req, res) => {
   try {
     const posts = await Post.find()
       .select("-comments")
@@ -236,9 +208,9 @@ router.get("/posts", optionalAuth, async (req, res) => {
 });
 
 // =======================
-// GET SINGLE POST
-// =======================
-router.get("/posts/:id", optionalAuth, async (req, res) => {
+ // GET SINGLE POST
+ // =======================
+router.get("/posts/:id", async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) {
@@ -252,8 +224,8 @@ router.get("/posts/:id", optionalAuth, async (req, res) => {
 });
 
 // =======================
-// ADD COMMENT TO POST
-// =======================
+ // ADD COMMENT TO POST
+ // =======================
 router.post("/posts/:id/comments", auth, async (req, res) => {
   try {
     const { message } = req.body;
@@ -288,8 +260,8 @@ router.post("/posts/:id/comments", auth, async (req, res) => {
 });
 
 // =======================
-// DELETE COMMENT (OWN COMMENT)
-// =======================
+ // DELETE COMMENT (OWN COMMENT)
+ // =======================
 router.delete("/posts/:postId/comments/:commentId", auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
@@ -318,94 +290,39 @@ router.delete("/posts/:postId/comments/:commentId", auth, async (req, res) => {
 });
 
 // =======================
-// SEND MESSAGE TO ADMIN
+// GET ALL USERS (Admin only)
 // =======================
-router.post("/messages", auth, async (req, res) => {
+router.get("/", auth, async (req, res) => {
   try {
-    const { message } = req.body;
-    
-    if (!message || message.trim() === "") {
-      return res.status(400).json({ message: "Message is required" });
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
     }
 
-    const newMessage = new Message({
-      direction: 'user-to-admin',
-      sender: req.user._id,
-      senderName: req.user.fullName || req.user.username,
-      senderEmail: req.user.email,
-      message: message.trim()
-    });
+    const users = await User.find({ isAdmin: false })
+      .select('-password')
+      .sort({ createdAt: -1 });
 
-    await newMessage.save();
-
-    res.status(201).json({
-      message: "Message sent successfully",
-      messageData: newMessage
-    });
+    res.json({ users });
   } catch (error) {
-    console.error("SEND MESSAGE ERROR:", error);
-    res.status(500).json({ message: "Failed to send message" });
+    console.error("GET USERS ERROR:", error);
+    res.status(500).json({ message: "Failed to fetch users" });
   }
 });
 
 // =======================
-// GET USER'S MESSAGES (both sent and received)
+// GET ADMIN INFO (For normal users to chat with)
 // =======================
-router.get("/messages", auth, async (req, res) => {
+router.get("/admin", auth, async (req, res) => {
   try {
-    // Get messages where user is sender OR recipient
-    const messages = await Message.find({
-      $or: [
-        { sender: req.user._id },
-        { recipient: req.user._id }
-      ]
-    }).sort({ createdAt: -1 });
-    res.json(messages);
-  } catch (error) {
-    console.error("GET MESSAGES ERROR:", error);
-    res.status(500).json({ message: "Failed to fetch messages" });
-  }
-});
-
-// =======================
-// GET UNREAD MESSAGES COUNT (For Notifications - includes admin replies)
-// =======================
-router.get("/messages/unread-count", auth, async (req, res) => {
-  try {
-    // Count messages sent TO this user (admin replies) that are unread
-    const count = await Message.countDocuments({ 
-      recipient: req.user._id,
-      isRead: false,
-      direction: 'admin-to-user'
-    });
-    res.json({ unreadCount: count });
-  } catch (error) {
-    console.error("GET UNREAD COUNT ERROR:", error);
-    res.status(500).json({ message: "Failed to get unread count" });
-  }
-});
-
-// =======================
-// MARK MESSAGE AS READ
-// =======================
-router.put("/messages/:id/read", auth, async (req, res) => {
-  try {
-    const message = await Message.findOneAndUpdate(
-      { _id: req.params.id, recipient: req.user._id },
-      { isRead: true, readAt: new Date() },
-      { returnDocument: 'after' }
-    );
-    
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
+    const admin = await User.findOne({ isAdmin: true }).select('-password');
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
     }
-
-    res.json({ message: "Message marked as read", messageData: message });
+    res.json({ admin });
   } catch (error) {
-    console.error("MARK READ ERROR:", error);
-    res.status(500).json({ message: "Failed to mark message as read" });
+    console.error("GET ADMIN ERROR:", error);
+    res.status(500).json({ message: "Failed to fetch admin" });
   }
 });
 
 module.exports = router;
-

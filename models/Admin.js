@@ -50,13 +50,12 @@ const AdminSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-AdminSchema.pre("save", async function(next) {
-  if (!this.isModified("password")) {
-    return next();
+AdminSchema.pre('save', async function() {
+  if (!this.isModified('password')) {
+    return;
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 // Compare password method
@@ -64,11 +63,14 @@ AdminSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Update timestamp on save
-AdminSchema.pre("save", function(next) {
+// ✅ NEW: Static method for username lookup
+AdminSchema.statics.findByUsername = async function(username) {
+  return this.findOne({ username });
+};
+
+// Update timestamp on save  
+AdminSchema.pre('save', function() {
   this.updatedAt = Date.now();
-  next();
 });
 
 module.exports = mongoose.model("Admin", AdminSchema);
-

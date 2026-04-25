@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -19,25 +19,29 @@ const MoonIcon = () => (
 );
 
 const Navbar = () => {
-  const { user, admin, isAuthenticated, isAdmin, logout, adminLogout } = useAuth();
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Listen for chat unread updates from Messages component
+  useEffect(() => {
+    const handleUnreadUpdate = (e) => {
+      if (typeof e.detail.count === 'number') {
+        setUnreadCount(e.detail.count);
+      } else if (e.detail.increment) {
+        setUnreadCount(prev => prev + 1);
+      }
+    };
+    window.addEventListener('chat-unread-update', handleUnreadUpdate);
+    return () => window.removeEventListener('chat-unread-update', handleUnreadUpdate);
+  }, []);
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
-
-  const handleAdminLogout = () => {
-    adminLogout();
-    navigate('/admin/login');
-  };
-
-  // Don't show navbar on admin login page
-  if (location.pathname === '/admin/login') {
-    return null;
-  }
 
   return (
     <nav className="navbar">
@@ -54,15 +58,19 @@ const Navbar = () => {
               <Link to="/admin" className="navbar-item">Dashboard</Link>
               <Link to="/admin/upload" className="navbar-item">Upload</Link>
               <Link to="/admin/posts" className="navbar-item">Posts</Link>
-              <Link to="/admin/messages" className="navbar-item">Messages</Link>
+              <Link to="/admin/comments" className="navbar-item">Comments</Link>
+              <Link to="/messages" className="navbar-item">
+                Messages
+                {unreadCount > 0 && <span className="nav-unread-badge">{unreadCount}</span>}
+              </Link>
               <Link to="/admin/settings" className="navbar-item">Settings</Link>
               <div className="navbar-actions">
                 <button onClick={toggleTheme} className="theme-toggle" aria-label="Toggle theme">
                   {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
                 </button>
                 <div className="navbar-user">
-                  <span className="user-name">Admin: {admin?.username}</span>
-                  <button onClick={handleAdminLogout} className="btn btn-sm btn-outline">
+                  <span className="user-name">Admin: {user?.username}</span>
+                  <button onClick={handleLogout} className="btn btn-sm btn-outline">
                     Logout
                   </button>
                 </div>
@@ -72,7 +80,10 @@ const Navbar = () => {
             <>
               {isAuthenticated && (
                 <>
-                  <Link to="/messages" className="navbar-item">Messages</Link>
+                  <Link to="/messages" className="navbar-item">
+                    Messages
+                    {unreadCount > 0 && <span className="nav-unread-badge">{unreadCount}</span>}
+                  </Link>
                   <div className="navbar-actions">
                     <button onClick={toggleTheme} className="theme-toggle" aria-label="Toggle theme">
                       {theme === 'dark' ? <SunIcon /> : <MoonIcon />}

@@ -24,7 +24,7 @@ const AdminManagePosts = () => {
 
   const fetchPosts = async () => {
     try {
-      const response = await axios.get('/api/admin/posts');
+      const response = await axios.get('/users/posts');
       setPosts(response.data);
     } catch (err) {
       setError('Failed to load posts');
@@ -35,7 +35,7 @@ const AdminManagePosts = () => {
 
   const handleDelete = async (postId) => {
     try {
-      await axios.delete(`/api/admin/posts/${postId}`);
+      await axios.delete(`admin/posts/${postId}`);
       setPosts(posts.filter(post => post._id !== postId));
       setDeleteConfirm(null);
     } catch (err) {
@@ -89,7 +89,7 @@ const AdminManagePosts = () => {
         data.append('media', editFile);
       }
 
-      const response = await axios.put(`/api/admin/posts/${editingPost._id}`, data, {
+      const response = await axios.put(`admin/posts/${editingPost._id}`, data, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

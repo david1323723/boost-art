@@ -15,7 +15,7 @@ const AdminComments = () => {
 
   const fetchComments = async () => {
     try {
-      const response = await axios.get('/api/admin/comments');
+      const response = await axios.get('/admin/comments');
       setComments(response.data);
     } catch (err) {
       setError('Failed to load comments');
@@ -26,7 +26,7 @@ const AdminComments = () => {
 
   const handleDelete = async (postId, commentId) => {
     try {
-      await axios.delete(`/api/admin/posts/${postId}/comments/${commentId}`);
+      await axios.delete(`admin/posts/${postId}/comments/${commentId}`);
       setComments(comments.filter(c => c._id !== commentId));
     } catch (err) {
       setError('Failed to delete comment');

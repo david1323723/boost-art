@@ -1,0 +1,7 @@
+[dotenv@17.3.1] injecting env (4) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
+🔥 Server running on port 5000
+📁 Upload directory: ./uploads
+🌐 API Base URL: http://localhost:5000/api
+✅ MongoDB Connected Successfully
+🔍 Checking admin in database...
+✅ Admin user already exists - boostart/123456 ready

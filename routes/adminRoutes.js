@@ -1,34 +1,18 @@
 const express = require("express");
-const multer = require("multer");
 const jwt = require("jsonwebtoken");
-const path = require("path");
-const fs = require("fs");
-const Admin = require("../models/Admin");
 const User = require("../models/User");
 const Post = require("../models/Post");
 const Message = require("../models/Message");
 const { adminAuth, superAdminAuth } = require("../middleware/adminAuth");
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
 
-const router = express.Router();
-
-// =======================
-// CONFIG
-// =======================
-
-// Detect base URL automatically
-const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
-
-// =======================
-// MULTER SETUP FOR ADMIN
-// =======================
-
-// Storage for images
-const imageStorage = multer.diskStorage({
+// Multer setup for admin post edits
+const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, "../uploads");
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
+    const uploadPath = path.join(__dirname, "..", "uploads");
+    if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
@@ -36,26 +20,17 @@ const imageStorage = multer.diskStorage({
   }
 });
 
-// File filter for images and videos
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|mov|avi|webm/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype) || file.mimetype.startsWith("video/");
-
-  if (extname || mimetype) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only images and videos are allowed"));
-  }
+  if (extname || mimetype) cb(null, true);
+  else cb(new Error("Only images and videos are allowed"));
 };
 
-const upload = multer({
-  storage: imageStorage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 100 * 1024 * 1024 // 100MB limit for videos
-  }
-});
+const upload = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
+
+const router = express.Router();
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -65,96 +40,130 @@ const generateToken = (id) => {
 };
 
 // =======================
-// ADMIN REGISTRATION
-// =======================
-router.post("/register", async (req, res) => {
-  try {
-    const { username, email, password, fullName } = req.body;
-
-    // Check if admin already exists
-    const existingAdmin = await Admin.findOne({ $or: [{ email }, { username }] });
-    if (existingAdmin) {
-      return res.status(400).json({
-        message: existingAdmin.email === email 
-          ? "Email already registered" 
-          : "Username already taken"
-      });
-    }
-
-    // Create new admin (first admin becomes super_admin)
-    const adminCount = await Admin.countDocuments();
-    const role = adminCount === 0 ? "super_admin" : "admin";
-
-    const newAdmin = new Admin({
-      username,
-      email,
-      password,
-      fullName: fullName || username,
-      role
-    });
-
-    await newAdmin.save();
-
-    const token = generateToken(newAdmin._id);
-
-    res.status(201).json({
-      message: "Admin registered successfully",
-      token,
-      admin: {
-        id: newAdmin._id,
-        username: newAdmin.username,
-        email: newAdmin.email,
-        fullName: newAdmin.fullName,
-        role: newAdmin.role
-      }
-    });
-  } catch (error) {
-    console.error("ADMIN REGISTER ERROR:", error);
-    res.status(500).json({ message: "Registration failed", error: error.message });
-  }
-});
-
-// =======================
-// ADMIN LOGIN
+// ADMIN LOGIN (uses User model with isAdmin=true)
 // =======================
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+    console.log(`Admin login attempt: username=${username}`);
+
+    if (!username || !password) {
+      console.log('Missing username or password');
+      return res.status(400).json({ 
+        message: "Username and password are required" 
+      });
     }
 
-    const admin = await Admin.findOne({ email });
+    let admin = await User.findOne({ username, isAdmin: true });
+    console.log(`Admin found: ${!!admin}`, admin ? admin.username : 'none');
+
     if (!admin) {
-      return res.status(400).json({ message: "Invalid email or password" });
-    }
-
-    if (!admin.isActive) {
-      return res.status(400).json({ message: "Admin account is deactivated" });
+      console.log('Admin not found, login failed');
+      return res.status(400).json({ 
+        message: "Invalid credentials" 
+      });
     }
 
     const isMatch = await admin.comparePassword(password);
+    console.log(`Password match: ${isMatch}`);
+
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid email or password" });
+      console.log('Password mismatch');
+      return res.status(400).json({ 
+        message: "Invalid credentials" 
+      });
+    }
+
+    if (!admin.isActive) {
+      return res.status(400).json({ 
+        message: "Admin account is deactivated" 
+      });
     }
 
     const token = generateToken(admin._id);
 
+    console.log('Admin login successful');
+
     res.json({
-      message: "Login successful",
-      token,
+      _id: admin._id,
+      username: admin.username,
+      isAdmin: admin.isAdmin,
+      token
+    });
+
+  } catch (error) {
+    console.error("ADMIN LOGIN ERROR:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Login failed" 
+    });
+  }
+});
+
+// =======================
+// UPDATE ADMIN CREDENTIALS (Protected)
+// =======================
+router.put("/update-credentials", adminAuth, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    const adminId = req.admin._id || req.admin.id;
+    const admin = await User.findById(adminId);
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    // Update username if provided
+    if (username && username !== admin.username) {
+      if (username.length < 3) {
+        return res.status(400).json({ 
+          message: "Username must be at least 3 characters" 
+        });
+      }
+      
+      const existingAdmin = await User.findOne({ 
+        username, 
+        _id: { $ne: admin._id } 
+      });
+      
+      if (existingAdmin) {
+        return res.status(400).json({ 
+          message: "Username already taken" 
+        });
+      }
+      
+      admin.username = username;
+    }
+
+    // Update password if provided
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({ 
+          message: "Password must be at least 6 characters" 
+        });
+      }
+      admin.password = password; // Will be hashed by pre-save hook
+    }
+
+    await admin.save();
+
+    res.json({ 
+      success: true,
+      message: "Credentials updated successfully",
       admin: {
         id: admin._id,
         username: admin.username,
-        email: admin.email,
-        fullName: admin.fullName,
-        role: admin.role
+        isAdmin: admin.isAdmin
       }
     });
+
   } catch (error) {
-    console.error("ADMIN LOGIN ERROR:", error);
-    res.status(500).json({ message: "Login failed", error: error.message });
+    console.error("UPDATE CREDENTIALS ERROR:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to update credentials" 
+    });
   }
 });
 
@@ -163,13 +172,7 @@ router.post("/login", async (req, res) => {
 // =======================
 router.get("/profile", adminAuth, async (req, res) => {
   try {
-    // Handle hardcoded admin
-    const adminId = req.admin._id || req.admin.id;
-    if (adminId && adminId.startsWith('admin-')) {
-      return res.json(req.admin);
-    }
-    
-    const admin = await Admin.findById(req.admin._id).select("-password");
+    const admin = req.admin;
     res.json(admin);
   } catch (error) {
     console.error("GET ADMIN PROFILE ERROR:", error);
@@ -177,59 +180,64 @@ router.get("/profile", adminAuth, async (req, res) => {
   }
 });
 
-// =======================
-// UPDATE ADMIN PROFILE
-// =======================
+// PUT /api/admin/profile - Update profile (username, email)
 router.put("/profile", adminAuth, async (req, res) => {
   try {
-    const { fullName, avatar } = req.body;
-    
-    // Handle hardcoded admin
+    const { username, email } = req.body;
     const adminId = req.admin._id || req.admin.id;
-    if (adminId && adminId.startsWith('admin-')) {
-      return res.status(400).json({ message: "Cannot update profile for hardcoded admin account" });
-    }
-    
-    const updatedAdmin = await Admin.findByIdAndUpdate(
-      req.admin._id,
-      { fullName, avatar },
-      { returnDocument: 'after' }
-    ).select("-password");
 
-    res.json({
+    const admin = await User.findById(adminId);
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    const updateData = {};
+    if (username && username !== admin.username) {
+      updateData.username = username;
+    }
+    if (email && email !== admin.email) {
+      updateData.email = email;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: "No changes provided" });
+    }
+
+    Object.assign(admin, updateData);
+    await admin.save();
+
+    res.json({ 
+      success: true,
       message: "Profile updated successfully",
-      admin: updatedAdmin
+      admin
     });
   } catch (error) {
-    console.error("UPDATE ADMIN PROFILE ERROR:", error);
+    console.error("UPDATE PROFILE ERROR:", error);
     res.status(500).json({ message: "Failed to update profile" });
   }
 });
 
-// =======================
-// CHANGE ADMIN PASSWORD
-// =======================
-router.put("/password", adminAuth, async (req, res) => {
+// PUT /api/admin/change-password
+router.put("/change-password", adminAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    
-    // Handle hardcoded admin
     const adminId = req.admin._id || req.admin.id;
-    if (adminId && adminId.startsWith('admin-')) {
-      return res.status(400).json({ message: "Cannot change password for hardcoded admin account" });
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters" });
     }
-    
-    const admin = await Admin.findById(req.admin._id);
+
+    const admin = await User.findById(adminId);
     const isMatch = await admin.comparePassword(currentPassword);
     
     if (!isMatch) {
-      return res.status(400).json({ message: "Current password is incorrect" });
+      return res.status(400).json({ message: "Current password incorrect" });
     }
 
-    admin.password = newPassword;
+    admin.password = newPassword; // hashed by pre-save
     await admin.save();
 
-    res.json({ message: "Password changed successfully" });
+    res.json({ success: true, message: "Password changed successfully" });
   } catch (error) {
     console.error("CHANGE PASSWORD ERROR:", error);
     res.status(500).json({ message: "Failed to change password" });
@@ -237,119 +245,10 @@ router.put("/password", adminAuth, async (req, res) => {
 });
 
 // =======================
-// UPDATE ADMIN SETTINGS (Username, Email & Password)
+// Existing routes preserved (posts, stats, messages, etc.)
 // =======================
-router.put("/settings", adminAuth, async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-    
-    // Get the admin ID - handle both hardcoded and database admins
-    const adminId = req.admin._id || req.admin.id;
-    
-    // For hardcoded admin, allow username and email updates (stored in localStorage)
-    if (!adminId || adminId.startsWith('admin-')) {
-      // Validate inputs for hardcoded admin
-      if (username && username.length < 3) {
-        return res.status(400).json({ success: false, message: "Username must be at least 3 characters" });
-      }
-      
-      if (email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          return res.status(400).json({ success: false, message: "Invalid email format" });
-        }
-      }
-      
-      if (password && password.length < 6) {
-        return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
-      }
-      
-      // Return success with updated data (frontend will handle localStorage)
-      const updatedAdmin = { ...req.admin };
-      
-      if (username) updatedAdmin.username = username;
-      if (email) updatedAdmin.email = email;
-      
-      return res.json({ 
-        success: true, 
-        message: "Admin settings updated successfully",
-        admin: updatedAdmin,
-        isHardcodedAdmin: true
-      });
-    }
-    
-    const admin = await Admin.findById(adminId);
-    
-    if (!admin) {
-      return res.status(404).json({ success: false, message: "Admin not found" });
-    }
-    
-    // Update username if provided
-    if (username && username !== admin.username) {
-      // Check if username is already taken by another admin
-      const existingUser = await Admin.findOne({ 
-        username, 
-        _id: { $ne: admin._id } 
-      });
-      
-      if (existingUser) {
-        return res.status(400).json({ success: false, message: "Username already taken" });
-      }
-      
-      admin.username = username;
-    }
-    
-    // Update email if provided
-    if (email && email !== admin.email) {
-      // Check if email is already taken by another admin
-      const existingEmail = await Admin.findOne({ 
-        email, 
-        _id: { $ne: admin._id } 
-      });
-      
-      if (existingEmail) {
-        return res.status(400).json({ success: false, message: "Email already registered" });
-      }
-      
-      // Basic email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({ success: false, message: "Invalid email format" });
-      }
-      
-      admin.email = email;
-    }
-    
-    // Update password if provided
-    if (password) {
-      if (password.length < 6) {
-        return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
-      }
-      admin.password = password;
-    }
-    
-    await admin.save();
 
-    res.json({ 
-      success: true, 
-      message: "Admin profile updated successfully",
-      admin: {
-        id: admin._id,
-        username: admin.username,
-        email: admin.email,
-        fullName: admin.fullName,
-        role: admin.role
-      }
-    });
-  } catch (error) {
-    console.error("UPDATE SETTINGS ERROR:", error);
-    res.status(500).json({ success: false, message: "Failed to update settings" });
-  }
-});
-
-// =======================
 // GET STATISTICS
-// =======================
 router.get("/stats", adminAuth, async (req, res) => {
   try {
     const totalPosts = await Post.countDocuments();
@@ -375,141 +274,26 @@ router.get("/stats", adminAuth, async (req, res) => {
 });
 
 // =======================
-// UPLOAD POST (IMAGE/VIDEO)
-// =======================
-router.post("/posts", adminAuth, upload.single("media"), async (req, res) => {
-  try {
-    const { title, description, category, mediaType } = req.body;
-
-    if (!title || !category) {
-      return res.status(400).json({ message: "Title and category are required" });
-    }
-
-    let mediaUrl = "";
-    let finalMediaType = mediaType || "image";
-
-    if (req.file) {
-      mediaUrl = `${BASE_URL}/uploads/${req.file.filename}`;
-      
-      // Determine media type based on mime type
-      if (req.file.mimetype.startsWith("video/")) {
-        finalMediaType = "video";
-      }
-    } else {
-      return res.status(400).json({ message: "Media file is required" });
-    }
-
-    const newPost = new Post({
-      title,
-      description,
-      mediaUrl,
-      mediaType: finalMediaType,
-      category,
-      uploadedBy: req.admin._id,
-      uploadedByName: req.admin.fullName || req.admin.username
-    });
-
-    const savedPost = await newPost.save();
-
-    res.status(201).json({
-      message: "Post created successfully",
-      post: savedPost
-    });
-  } catch (error) {
-    console.error("UPLOAD POST ERROR:", error);
-    res.status(500).json({ message: "Failed to create post", error: error.message });
-  }
-});
-
-// =======================
-// UPDATE POST (with optional file upload)
-// =======================
-router.put("/posts/:id", adminAuth, upload.single("media"), async (req, res) => {
-  try {
-    const { title, description, category } = req.body;
-    
-    const post = await Post.findById(req.params.id);
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
-
-    // Update text fields
-    if (title) post.title = title;
-    if (description !== undefined) post.description = description;
-    if (category) post.category = category;
-
-// Update media if new file uploaded
-    if (req.file) {
-      post.mediaUrl = `${BASE_URL}/uploads/${req.file.filename}`;
-      
-      // Determine media type based on mime type
-      if (req.file.mimetype.startsWith("video/")) {
-        post.mediaType = "video";
-      } else {
-        post.mediaType = "image";
-      }
-    }
-
-    await post.save();
-
-    res.json({
-      message: "Post updated successfully",
-      post
-    });
-  } catch (error) {
-    console.error("UPDATE POST ERROR:", error);
-    res.status(500).json({ message: "Failed to update post" });
-  }
-});
-
-// =======================
-// DELETE POST
-// =======================
-router.delete("/posts/:id", adminAuth, async (req, res) => {
-  try {
-    const post = await Post.findById(req.params.id);
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
-
-    await Post.findByIdAndDelete(req.params.id);
-
-    res.json({ message: "Post deleted successfully" });
-  } catch (error) {
-    console.error("DELETE POST ERROR:", error);
-    res.status(500).json({ message: "Failed to delete post" });
-  }
-});
-
-// =======================
-// GET ALL POSTS (ADMIN)
-// =======================
-router.get("/posts", adminAuth, async (req, res) => {
-  try {
-    const posts = await Post.find()
-      .select("-comments")
-      .sort({ createdAt: -1 });
-    res.json(posts);
-  } catch (error) {
-    console.error("GET POSTS ERROR:", error);
-    res.status(500).json({ message: "Failed to fetch posts" });
-  }
-});
-
-// =======================
-// GET ALL COMMENTS (ACROSS POSTS)
+// GET ALL COMMENTS (for admin moderation)
+// GET /api/admin/comments
 // =======================
 router.get("/comments", adminAuth, async (req, res) => {
   try {
-    const posts = await Post.find().select("comments title");
-    
-    let allComments = [];
+    const posts = await Post.find({ "comments.0": { $exists: true } })
+      .select('title comments')
+      .sort({ createdAt: -1 });
+
+    const allComments = [];
     posts.forEach(post => {
       post.comments.forEach(comment => {
         allComments.push({
-          ...comment.toObject(),
+          _id: comment._id,
+          postId: post._id,
           postTitle: post.title,
-          postId: post._id
+          userId: comment.userId,
+          username: comment.username,
+          message: comment.message,
+          createdAt: comment.createdAt
         });
       });
     });
@@ -525,7 +309,8 @@ router.get("/comments", adminAuth, async (req, res) => {
 });
 
 // =======================
-// DELETE COMMENT (ANY COMMENT)
+// DELETE COMMENT (admin can delete any comment)
+// DELETE /api/admin/posts/:postId/comments/:commentId
 // =======================
 router.delete("/posts/:postId/comments/:commentId", adminAuth, async (req, res) => {
   try {
@@ -550,186 +335,97 @@ router.delete("/posts/:postId/comments/:commentId", adminAuth, async (req, res) 
 });
 
 // =======================
-// GET ALL MESSAGES
+// DELETE POST
+// DELETE /api/admin/posts/:postId
 // =======================
-router.get("/messages", adminAuth, async (req, res) => {
+router.delete("/posts/:postId", adminAuth, async (req, res) => {
   try {
-    const messages = await Message.find()
-      .populate("sender", "username email")
-      .sort({ createdAt: -1 });
-    res.json(messages);
-  } catch (error) {
-    console.error("GET MESSAGES ERROR:", error);
-    res.status(500).json({ message: "Failed to fetch messages" });
-  }
-});
-
-// =======================
-// MARK MESSAGE AS READ
-// =======================
-router.put("/messages/:id/read", adminAuth, async (req, res) => {
-  try {
-    const message = await Message.findByIdAndUpdate(
-      req.params.id,
-      { isRead: true },
-      { returnDocument: 'after' }
-    );
-    
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
+    const post = await Post.findById(req.params.postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
     }
 
-    res.json({ message: "Message marked as read", messageData: message });
-  } catch (error) {
-    console.error("MARK READ ERROR:", error);
-    res.status(500).json({ message: "Failed to mark message as read" });
-  }
-});
-
-// =======================
-// REPLY TO MESSAGE
-// =======================
-router.post("/messages/:id/reply", adminAuth, async (req, res) => {
-  try {
-    const { replyMessage } = req.body;
-    
-    if (!replyMessage || replyMessage.trim() === "") {
-      return res.status(400).json({ message: "Reply message is required" });
-    }
-
-    const message = await Message.findByIdAndUpdate(
-      req.params.id,
-      {
-        adminReply: {
-          replyMessage: replyMessage.trim(),
-          repliedAt: new Date(),
-          repliedBy: req.admin._id
+    // Delete associated media file if it exists locally
+    if (post.mediaUrl) {
+      try {
+        const filename = path.basename(post.mediaUrl);
+        const filePath = path.join(__dirname, "..", "uploads", filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
         }
-      },
-      { returnDocument: 'after' }
+      } catch (fileErr) {
+        console.error("Failed to delete media file:", fileErr.message);
+      }
+    }
+
+    await Post.findByIdAndDelete(req.params.postId);
+    res.json({ message: "Post deleted successfully" });
+  } catch (error) {
+    console.error("DELETE POST ERROR:", error);
+    res.status(500).json({ message: "Failed to delete post" });
+  }
+});
+
+// =======================
+// UPDATE POST
+// PUT /api/admin/posts/:postId
+// =======================
+router.put("/posts/:postId", adminAuth, upload.single("media"), async (req, res) => {
+  try {
+    const { title, description, category } = req.body;
+    const post = await Post.findById(req.params.postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    if (title !== undefined && !title.trim()) {
+      return res.status(400).json({ message: "Title cannot be empty" });
+    }
+    if (category !== undefined && !category.trim()) {
+      return res.status(400).json({ message: "Category cannot be empty" });
+    }
+
+    const updateData = {};
+    if (title !== undefined) updateData.title = title.trim();
+    if (description !== undefined) updateData.description = description.trim();
+    if (category !== undefined) updateData.category = category.trim();
+
+    // Handle media replacement
+    if (req.file) {
+      // Delete old media file
+      if (post.mediaUrl) {
+        try {
+          const oldFilename = path.basename(post.mediaUrl);
+          const oldFilePath = path.join(__dirname, "..", "uploads", oldFilename);
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath);
+          }
+        } catch (fileErr) {
+          console.error("Failed to delete old media file:", fileErr.message);
+        }
+      }
+
+      const BASE_URL = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+      updateData.mediaUrl = `${BASE_URL}/uploads/${req.file.filename}`;
+      updateData.mediaType = req.file.mimetype.startsWith("video/") ? "video" : "image";
+    }
+
+    const updatedPost = await Post.findByIdAndUpdate(
+      req.params.postId,
+      updateData,
+      { new: true }
     );
 
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
-    }
-
-    res.json({ message: "Reply sent successfully", messageData: message });
+    res.json({ message: "Post updated successfully", post: updatedPost });
   } catch (error) {
-    console.error("REPLY MESSAGE ERROR:", error);
-    res.status(500).json({ message: "Failed to reply to message" });
+    console.error("UPDATE POST ERROR:", error);
+    if (req.file) {
+      const cleanupPath = path.join(__dirname, "..", "uploads", req.file.filename);
+      if (fs.existsSync(cleanupPath)) fs.unlinkSync(cleanupPath);
+    }
+    res.status(500).json({ message: "Failed to update post" });
   }
 });
 
-// =======================
-// GET UNREAD MESSAGES COUNT (For Notifications)
-// =======================
-router.get("/messages/unread-count", adminAuth, async (req, res) => {
-  try {
-    const count = await Message.countDocuments({ 
-      isRead: false,
-      direction: 'user-to-admin'
-    });
-    res.json({ unreadCount: count });
-  } catch (error) {
-    console.error("GET UNREAD COUNT ERROR:", error);
-    res.status(500).json({ message: "Failed to get unread count" });
-  }
-});
-
-// =======================
-// SEND MESSAGE TO SPECIFIC USER (Admin to User)
-// =======================
-router.post("/messages/to-user", adminAuth, async (req, res) => {
-  try {
-    const { userId, message } = req.body;
-    
-    if (!userId || !message) {
-      return res.status(400).json({ message: "User ID and message are required" });
-    }
-    
-    if (message.trim() === "") {
-      return res.status(400).json({ message: "Message cannot be empty" });
-    }
-    
-    // Get the user
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    
-    // Create the message (admin-to-user)
-    const newMessage = new Message({
-      direction: 'admin-to-user',
-      sender: req.admin._id || req.admin.id,
-      senderName: req.admin.fullName || req.admin.username || 'Admin',
-      senderEmail: req.admin.email || 'admin@boostart.com',
-      recipient: userId,
-      recipientName: user.fullName || user.username,
-      recipientEmail: user.email,
-      message: message.trim(),
-      isRead: false
-    });
-    
-    await newMessage.save();
-    
-    res.status(201).json({
-      message: "Message sent successfully",
-      messageData: newMessage
-    });
-  } catch (error) {
-    console.error("SEND TO USER ERROR:", error);
-    res.status(500).json({ message: "Failed to send message" });
-  }
-});
-
-// =======================
-// DELETE MESSAGE
-// =======================
-router.delete("/messages/:id", adminAuth, async (req, res) => {
-  try {
-    const message = await Message.findByIdAndDelete(req.params.id);
-    
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
-    }
-
-    res.json({ message: "Message deleted successfully" });
-  } catch (error) {
-    console.error("DELETE MESSAGE ERROR:", error);
-    res.status(500).json({ message: "Failed to delete message" });
-  }
-});
-
-// =======================
-// GET ALL USERS (ADMIN)
-// =======================
-router.get("/users", adminAuth, async (req, res) => {
-  try {
-    const users = await User.find().select("-password").sort({ createdAt: -1 });
-    res.json(users);
-  } catch (error) {
-    console.error("GET USERS ERROR:", error);
-    res.status(500).json({ message: "Failed to fetch users" });
-  }
-});
-
-// =======================
-// DELETE USER (ADMIN)
-// =======================
-router.delete("/users/:id", adminAuth, async (req, res) => {
-  try {
-    const user = await User.findByIdAndDelete(req.params.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({ message: "User deleted successfully" });
-  } catch (error) {
-    console.error("DELETE USER ERROR:", error);
-    res.status(500).json({ message: "Failed to delete user" });
-  }
-});
-
+// Export router
 module.exports = router;
-

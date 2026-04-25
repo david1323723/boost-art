@@ -1,7 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-// Verify JWT token for authenticated users
 const auth = async (req, res, next) => {
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
@@ -15,35 +14,25 @@ const auth = async (req, res, next) => {
     const user = await User.findById(decoded.id).select("-password");
     
     if (!user) {
-      return res.status(401).json({ message: "Token is not valid" });
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    if (!user.isActive) {
+      return res.status(401).json({ message: "Account deactivated" });
     }
 
     req.user = user;
-    req.token = token;
     next();
   } catch (error) {
     res.status(401).json({ message: "Token is not valid" });
   }
 };
 
-// Optional auth - continues without authentication but attaches user if token exists
-const optionalAuth = async (req, res, next) => {
-  try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-    
-    if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || "boostartsecretkey");
-      const user = await User.findById(decoded.id).select("-password");
-      if (user) {
-        req.user = user;
-        req.token = token;
-      }
-    }
-    next();
-  } catch (error) {
-    next();
+const requireAdmin = (req, res, next) => {
+  if (!req.user.isAdmin) {
+    return res.status(403).json({ message: "Admin access required" });
   }
+  next();
 };
 
-module.exports = { auth, optionalAuth };
-
+module.exports = { auth, requireAdmin };

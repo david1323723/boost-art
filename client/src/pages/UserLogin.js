@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PasswordInput from '../components/PasswordInput';
 import './Auth.css';
 
 const UserLogin = () => {
@@ -26,57 +27,16 @@ const UserLogin = () => {
     setError('');
 
     try {
-      // Check for admin credentials first (client-side check)
-      if (formData.username === 'david' && formData.password === '0791323723') {
-        // Admin login - create admin session
-        const adminData = {
-          id: 'admin-001',
-          username: 'david',
-          email: 'david@boostart.com',
-          fullName: 'David',
-          role: 'admin'
-        };
-        const fakeToken = 'admin-token-' + Date.now();
-        localStorage.setItem('adminToken', fakeToken);
-        localStorage.setItem('admin', JSON.stringify(adminData));
-        
-        // Use window.location for full reload to ensure AuthContext is re-initialized
-        window.location.href = '/admin/dashboard';
-        return;
-      }
-
       // Regular user login - use the login function from AuthContext
       const result = await login(formData.username, formData.password);
       
       if (result.success) {
-        // Check if response indicates admin (from backend)
-        const adminData = localStorage.getItem('admin');
-        if (adminData) {
-          window.location.href = '/admin/dashboard';
-        } else {
-          window.location.href = '/';
-        }
+        window.location.href = '/';
       } else {
         setError(result.message);
       }
     } catch (err) {
-      // If API call fails, check if it was the hardcoded admin
-      if (formData.username === 'david' && formData.password === '0791323723') {
-        // Admin login
-        const adminData = {
-          id: 'admin-001',
-          username: 'david',
-          email: 'david@boostart.com',
-          fullName: 'David',
-          role: 'admin'
-        };
-        const fakeToken = 'admin-token-' + Date.now();
-        localStorage.setItem('adminToken', fakeToken);
-        localStorage.setItem('admin', JSON.stringify(adminData));
-        window.location.href = '/admin/dashboard';
-      } else {
-        setError(err.response?.data?.message || 'Invalid credentials');
-      }
+      setError(err.response?.data?.message || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -115,8 +75,7 @@ const UserLogin = () => {
 
             <div className="form-group">
               <label>Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 name="password"
                 value={formData.password}
                 onChange={handleChange}

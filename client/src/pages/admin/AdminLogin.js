@@ -7,7 +7,7 @@ const AdminLogin = () => {
   const { adminLogin } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: ''
   });
   const [loading, setLoading] = useState(false);
@@ -26,7 +26,7 @@ const AdminLogin = () => {
     setLoading(true);
     setError('');
 
-    const result = await adminLogin(formData.email, formData.password);
+    const result = await adminLogin(formData.username, formData.password);
     
     if (result.success) {
       navigate('/admin');
@@ -63,13 +63,13 @@ const AdminLogin = () => {
 
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="form-group">
-              <label>Email</label>
+              <label>Username</label>
               <input
-                type="email"
-                name="email"
-                value={formData.email}
+                type="text"
+                name="username"
+                value={formData.username}
                 onChange={handleChange}
-                placeholder="Enter admin email"
+                placeholder="Enter admin username"
                 required
               />
             </div>
@@ -83,6 +83,7 @@ const AdminLogin = () => {
                 onChange={handleChange}
                 placeholder="Enter password"
                 required
+                autoComplete="new-password"
               />
             </div>
 

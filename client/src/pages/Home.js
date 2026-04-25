@@ -24,7 +24,7 @@ const Home = () => {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/posts');
+      const response = await axios.get('/users/posts');
       setPosts(response.data);
       setError('');
     } catch (err) {
@@ -130,12 +130,15 @@ const Home = () => {
                   <p className="card-description">
                     {post.description ? post.description.substring(0, 80) + '...' : 'No description'}
                   </p>
-                  <div className="card-meta">
-                    <span className="card-date">{formatDate(post.createdAt)}</span>
-                    <span className="card-comments">
-                      {post.comments ? post.comments.length : 0} comments
-                    </span>
-                  </div>
+                <div className="card-meta">
+                  <span className="card-date">{formatDate(post.createdAt)}</span>
+                  <span className="card-comments">
+                    {post.comments ? post.comments.length : 0} comments
+                  </span>
+                  <span className="card-likes">
+                    ❤️ {post.likes ? post.likes.length : 0}
+                  </span>
+                </div>
                 </div>
               </Link>
             ))}

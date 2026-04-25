@@ -21,7 +21,7 @@ const PostDetails = () => {
     const fetchPost = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/posts/${id}`);
+        const response = await axios.get(`/posts/${id}`);
         if (isMounted) {
           setPost(response.data);
           setError('');
@@ -61,7 +61,7 @@ const PostDetails = () => {
     try {
       setSubmitting(true);
       setCommentError('');
-      const response = await axios.post(`/api/users/posts/${id}/comments`, {
+      const response = await axios.post(`/users/posts/${id}/comments`, {
         message: comment
       });
       
@@ -87,7 +87,7 @@ const PostDetails = () => {
 
     try {
       setDeletingComment(commentId);
-      await axios.delete(`/api/users/posts/${id}/comments/${commentId}`);
+      await axios.delete(`/users/posts/${id}/comments/${commentId}`);
       
       setPost(prev => ({
         ...prev,
@@ -188,6 +188,17 @@ const PostDetails = () => {
                 <p>{post.description}</p>
               </div>
             )}
+
+            <div className="post-meta">
+              <div className="post-stats">
+                <span>
+                  ❤️ {post.likes?.length || 0} likes
+                </span>
+                <span>
+                  💬 {post.comments?.length || 0} comments
+                </span>
+              </div>
+            </div>
 
             {/* Comments Section */}
             <div className="comments-section">

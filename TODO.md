@@ -1,21 +1,17 @@
-# Footer Improvement Task
+# Fix Routing & API Connection Issues
 
-## Task: Improve the website footer - make it smaller, cleaner, and more modern
+## Steps
 
-### Steps:
-- [x] 1. Analyze current footer implementation
-- [x] 2. Create improvement plan and get approval
-- [x] 3. Update Footer.js - simplify to essential elements only
-- [x] 4. Update Footer.css - reduce padding, improve styling
-- [x] 5. Verify dark mode support (using CSS variables and [data-theme="dark"])
-- [x] 6. Test responsive design (added media queries for tablet/mobile)
+- [x] 1. Gather information (read all relevant files)
+- [x] 2. Fix `client/src/context/AuthContext.js`
+- [x] 3. Fix `client/src/pages/UserLogin.js`
+- [x] 4. Fix `client/src/pages/Messages.js`
+- [x] 5. Fix `client/src/pages/UserSettings.js`
+- [x] 6. Fix `routes/userRoutes.js`
+- [x] 7. Clean `server.js` & add Admin model seeding
+- [x] 8. Update root `package.json`
+- [x] 9. Fix `client/public/index.html`
+- [x] 10. Test backend/frontend startup
 
-### Changes Summary:
-- Reduce padding to 20px (was ~32px)
-- Keep only: website name, copyright, 3 quick links (Gallery, Contact, Login)
-- Added: small social icons (Facebook, Instagram, Twitter)
-- Single-row layout on desktop, stacked on mobile
-- Full dark mode support using CSS variables
-- Responsive at 768px (tablet) and 480px (mobile)
-- Uses primary color (#6366F1) for brand name to match website theme
+All fixes completed successfully.
 

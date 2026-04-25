@@ -4,7 +4,7 @@ import axios from '../../api';
 import './AdminSettings.css';
 
 const AdminSettings = () => {
-  const { admin } = useAuth();
+  const { user, updateAdminProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -48,11 +48,11 @@ const AdminSettings = () => {
     // Prepare the update data
     const updateData = {};
     
-    if (settingsData.newUsername && settingsData.newUsername !== admin?.username) {
+    if (settingsData.newUsername && settingsData.newUsername !== user?.username) {
       updateData.username = settingsData.newUsername;
     }
     
-    if (settingsData.newEmail && settingsData.newEmail !== admin?.email) {
+    if (settingsData.newEmail && settingsData.newEmail !== user?.email) {
       updateData.email = settingsData.newEmail;
     }
     
@@ -68,18 +68,10 @@ const AdminSettings = () => {
     }
 
     try {
-      const response = await axios.put('/api/admin/settings', updateData);
-      const data = response.data;
+      const result = await updateAdminProfile(updateData);
 
-      if (data.success) {
-        setMessage({ type: 'success', text: data.message });
-        
-        // Update localStorage with new admin data
-        if (data.admin) {
-          localStorage.setItem('admin', JSON.stringify(data.admin));
-          // Trigger a page reload to refresh the auth state
-          window.location.reload();
-        }
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message });
         
         // Clear the form
         setSettingsData({
@@ -89,7 +81,7 @@ const AdminSettings = () => {
           confirmPassword: ''
         });
       } else {
-        setMessage({ type: 'error', text: data.message || 'Failed to update settings' });
+        setMessage({ type: 'error', text: result.message || 'Failed to update settings' });
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to update settings';
@@ -120,7 +112,7 @@ const AdminSettings = () => {
                 <label>Current Username</label>
                 <input 
                   type="text" 
-                  value={admin?.username || ''} 
+                  value={user?.username || ''} 
                   disabled 
                   className="input-disabled"
                 />
@@ -141,7 +133,7 @@ const AdminSettings = () => {
                 <label>Current Email</label>
                 <input 
                   type="email" 
-                  value={admin?.email || ''} 
+                  value={user?.email || ''} 
                   disabled 
                   className="input-disabled"
                 />
@@ -162,7 +154,7 @@ const AdminSettings = () => {
                 <label>Role</label>
                 <input 
                   type="text" 
-                  value={admin?.role || ''} 
+                  value={user?.isAdmin ? 'Admin' : ''} 
                   disabled 
                   className="input-disabled"
                 />
@@ -174,22 +166,26 @@ const AdminSettings = () => {
 
               <div className="form-group">
                 <label>New Password</label>
-                <input 
+                <input
                   type="password"
                   value={settingsData.password}
                   onChange={(e) => setSettingsData({...settingsData, password: e.target.value})}
                   placeholder="Enter new password"
                   minLength="6"
+                  name="password"
+                  autoComplete="new-password"
                 />
               </div>
 
               <div className="form-group">
                 <label>Confirm New Password</label>
-                <input 
+                <input
                   type="password"
                   value={settingsData.confirmPassword}
                   onChange={(e) => setSettingsData({...settingsData, confirmPassword: e.target.value})}
                   placeholder="Confirm new password"
+                  name="confirmPassword"
+                  autoComplete="new-password"
                 />
               </div>
 

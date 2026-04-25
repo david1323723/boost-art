@@ -84,9 +84,9 @@ const AdminUpload = () => {
       data.append('description', formData.description);
       data.append('category', formData.category);
       data.append('mediaType', formData.mediaType);
-      data.append('media', file);
+      data.append('image', file);
 
-      await axios.post('/api/admin/posts', data, {
+      await axios.post('/posts', data, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

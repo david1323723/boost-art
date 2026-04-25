@@ -16,7 +16,6 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUpload from './pages/admin/AdminUpload';
 import AdminManagePosts from './pages/admin/AdminManagePosts';
 import AdminComments from './pages/admin/AdminComments';
-import AdminMessages from './pages/admin/AdminMessages';
 import AdminSettings from './pages/admin/AdminSettings';
 
 // Components
@@ -24,6 +23,8 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
+
+const AdminMessagesRedirect = () => <Navigate to="/messages" replace />;
 
 function App() {
   return (
@@ -52,12 +53,14 @@ function App() {
               } />
 
               {/* Admin Routes */}
-              <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={
                 <AdminRoute>
                   <AdminDashboard />
                 </AdminRoute>
               } />
+              <Route path="/admin/login" element={<AdminLogin />} />
+
+
               <Route path="/admin" element={
                 <AdminRoute>
                   <AdminDashboard />
@@ -78,14 +81,19 @@ function App() {
                   <AdminComments />
                 </AdminRoute>
               } />
-              <Route path="/admin/messages" element={
-                <AdminRoute>
-                  <AdminMessages />
-                </AdminRoute>
-              } />
               <Route path="/admin/settings" element={
                 <AdminRoute>
                   <AdminSettings />
+                </AdminRoute>
+              } />
+              <Route path="/admin/chat" element={
+                <AdminRoute>
+                  <Messages />
+                </AdminRoute>
+              } />
+              <Route path="/admin/messages" element={
+                <AdminRoute>
+                  <AdminMessagesRedirect />
                 </AdminRoute>
               } />
 

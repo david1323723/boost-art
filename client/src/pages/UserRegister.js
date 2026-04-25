@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PasswordInput from '../components/PasswordInput';
 import './Auth.css';
 
 const UserRegister = () => {
@@ -114,8 +115,7 @@ const UserRegister = () => {
 
             <div className="form-group">
               <label>Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
@@ -127,8 +127,7 @@ const UserRegister = () => {
 
             <div className="form-group">
               <label>Confirm Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}

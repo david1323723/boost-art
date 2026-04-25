@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
-  const { admin } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalPosts: 0,
     totalUsers: 0,
@@ -21,7 +21,7 @@ const AdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get('/api/admin/stats');
+      const response = await axios.get('admin/stats');
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -57,7 +57,7 @@ const AdminDashboard = () => {
       value: stats.totalMessages,
       icon: '✉️',
       subValue: `${stats.unreadMessages} unread`,
-      link: '/admin/messages',
+      link: '/messages',
       color: '#FF6B6B'
     }
   ];
@@ -88,7 +88,7 @@ const AdminDashboard = () => {
       title: 'View Messages',
       description: 'Check messages from users',
       icon: '📨',
-      link: '/admin/messages',
+      link: '/messages',
       btnText: 'View'
     }
   ];
@@ -110,7 +110,7 @@ const AdminDashboard = () => {
             <img src="/logo.png" alt="Boost Art Designer Logo" className="site-logo" />
           </div>
           <h1>Admin Dashboard</h1>
-          <p>Welcome back, {admin?.fullName || admin?.username}</p>
+          <p>Welcome back, {user?.fullName || user?.username}</p>
         </div>
 
         {/* Stats Grid */}
@@ -155,15 +155,15 @@ const AdminDashboard = () => {
             <div className="info-list">
               <div className="info-item">
                 <span className="info-label">Username:</span>
-                <span className="info-value">{admin?.username}</span>
+                <span className="info-value">{user?.username}</span>
               </div>
               <div className="info-item">
                 <span className="info-label">Email:</span>
-                <span className="info-value">{admin?.email}</span>
+                <span className="info-value">{user?.email}</span>
               </div>
               <div className="info-item">
                 <span className="info-label">Role:</span>
-                <span className="info-value badge badge-primary">{admin?.role}</span>
+                <span className="info-value badge badge-primary">{user?.isAdmin ? 'Admin' : ''}</span>
               </div>
             </div>
             <Link to="/admin/settings" className="btn btn-outline mt-2">

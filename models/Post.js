@@ -27,7 +27,7 @@ const PostSchema = new mongoose.Schema({
   },
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Admin",
+    ref: "User",
     default: null
   },
   uploadedByName: {
@@ -53,6 +53,14 @@ const PostSchema = new mongoose.Schema({
       createdAt: {
         type: Date,
         default: Date.now
+      }
+    }
+  ],
+  likes: [
+    {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
       }
     }
   ],

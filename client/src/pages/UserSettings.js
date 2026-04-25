@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import PasswordInput from '../components/PasswordInput';
 import axios from '../api';
 import './UserSettings.css';
 
@@ -56,7 +57,7 @@ const UserSettings = () => {
     }
 
     try {
-      const response = await axios.put('/api/users/password', {
+      const response = await axios.put('/users/password', {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
       });
@@ -173,35 +174,35 @@ const UserSettings = () => {
                 <form onSubmit={handlePasswordSubmit}>
                   <div className="form-group">
                     <label>Current Password</label>
-                    <input 
-                      type="password"
+                    <PasswordInput
                       value={passwordData.currentPassword}
                       onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
                       placeholder="Enter current password"
                       required
+                      name="currentPassword"
                     />
                   </div>
 
                   <div className="form-group">
                     <label>New Password</label>
-                    <input 
-                      type="password"
+                    <PasswordInput
                       value={passwordData.newPassword}
                       onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
                       placeholder="Enter new password"
                       required
                       minLength="6"
+                      name="newPassword"
                     />
                   </div>
 
                   <div className="form-group">
                     <label>Confirm New Password</label>
-                    <input 
-                      type="password"
+                    <PasswordInput
                       value={passwordData.confirmPassword}
                       onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
                       placeholder="Confirm new password"
                       required
+                      name="confirmPassword"
                     />
                   </div>
 
