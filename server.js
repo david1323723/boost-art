@@ -29,7 +29,7 @@ const app = express();
 // =======================
 // CONFIG
 // =======================
-const BASE_URL = process.env.API_BASE_URL || 'https://boost-art-backend.onrender.com';
+const BASE_URL = process.env.API_BASE_URL || process.env.BASE_URL || 'https://boost-art-backend.onrender.com';
 
 // =======================
 // Middleware
@@ -85,26 +85,40 @@ const upload = multer({
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
     console.log("✅ MongoDB Connected Successfully");
-    console.log("🔍 Checking admin in database...");
-    const User = require('./models/User');
-    const userAdmin = await User.findOne({ username: 'boostart' });
-    if (!userAdmin) {
-      console.log("📝 Creating default admin user...");
-      const newAdmin = new User({
-        username: 'boostart',
-        email: 'admin@boostart.com',
-        password: '123456',
-        fullName: 'BoostArt Admin',
-        isAdmin: true
-      });
-      await newAdmin.save();
-      console.log('✅ Admin user created successfully - boostart/123456');
-    } else {
-      console.log('✅ Admin user already exists - boostart/123456 ready');
+
+    try {
+      console.log("🔍 Checking admin in database...");
+
+      const userAdmin = await User.findOne({ username: 'boostart' });
+
+      if (!userAdmin) {
+        console.log("📝 Creating default admin user...");
+
+        const newAdmin = new User({
+          username: 'boostart',
+          email: 'admin@boostart.com',
+          password: '123456',
+          fullName: 'BoostArt Admin',
+          isAdmin: true
+        });
+
+        await newAdmin.save();
+
+        console.log("✅ Admin user created successfully - boostart/123456");
+      } else {
+        console.log("✅ Admin user already exists");
+      }
+
+    } catch (adminError) {
+      console.error("❌ Admin setup error:", adminError);
     }
+
   })
   .catch((err) => {
     console.error("❌ MongoDB Connection Error:", err);
+
+    // STOP SERVER if MongoDB fails
+    process.exit(1);
   });
 
 // =======================
