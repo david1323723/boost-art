@@ -55,7 +55,7 @@ const Messages = () => {
     const newSocket = io(
       process.env.NODE_ENV === 'production'
         ? 'https://boost-art-api.onrender.com'
-        : 'http://localhost:5000',
+        : 'https://boost-art-backend.onrender.com',
       {
         auth: { token },
         reconnection: true,

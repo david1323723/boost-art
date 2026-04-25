@@ -29,7 +29,7 @@ const app = express();
 // =======================
 // CONFIG
 // =======================
-const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+const BASE_URL = process.env.REACT_APP_API_URL;
 
 // =======================
 // Middleware

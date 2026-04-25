@@ -8,7 +8,7 @@ require('dotenv').config();
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/boostart';
 
 // Old and new URLs
-const OLD_URL = 'http://localhost:5000/uploads';
+const OLD_URL = 'https://boost-art-backend.onrender.com';
 const NEW_URL = 'https://boost-art-backend.onrender.com/uploads';
 
 // Connect to MongoDB
