@@ -22,6 +22,7 @@ const Messages = () => {
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  // eslint-disable-next-line no-unused-vars
   const socketRef = useRef(null);
   const selectedUserRef = useRef(null);
   const userIdRef = useRef(null);
@@ -219,7 +220,8 @@ const Messages = () => {
           });
 
           setConversations(merged);
-
+          
+          // eslint-disable-next-line no-unused-vars
           const total = merged.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
           setTotalUnread(total);
           window.dispatchEvent(new CustomEvent('chat-unread-update', { detail: { count: total } }));
