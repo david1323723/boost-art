@@ -34,12 +34,12 @@ const BASE_URL = process.env.API_BASE_URL || 'https://boost-art-backend.onrender
 // =======================
 // Middleware
 // =======================
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://boost-art-drab.vercel.app',
-  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'multipart/form-data'],
+const corsOptions = {
+  origin: ["https://boost-art-drab.vercel.app"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
-}));
+};
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
