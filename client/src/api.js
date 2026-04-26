@@ -3,11 +3,12 @@ import axios from 'axios';
 // Global base URL configuration
 export const BASE_URL =
   process.env.REACT_APP_API_URL || 'https://boost-art-backend.onrender.com';
-export const SOCKET_BASE_URL = process.env.REACT_APP_SOCKET_URL || BASE_URL/api;
 
-// Configure axios base URL
+export const SOCKET_BASE_URL =
+  process.env.REACT_APP_SOCKET_URL || BASE_URL;
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://boost-art-backend.onrender.com/api'
+  baseURL: `${BASE_URL}/api`
 });
 
 // Request interceptor: attach token from localStorage
