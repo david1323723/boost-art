@@ -92,7 +92,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 }
+  limits: { fileSize: 1024 * 1024 * 1024 }
 });
 
 
@@ -304,6 +304,8 @@ const io =
     }
 
   });
+  app.use(express.json({ limit: "1gb" }));
+app.use(express.urlencoded({ extended: true, limit: "1gb" }));
 
 
 // =======================

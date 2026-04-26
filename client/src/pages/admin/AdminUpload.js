@@ -41,8 +41,8 @@ const AdminUpload = () => {
     if (!selectedFile) return;
 
     // Validate file size (100MB max)
-    if (selectedFile.size > 100 * 1024 * 1024) {
-      setError('File size must be less than 100MB');
+    if (selectedFile.size > 1024 * 1024 * 1024) {
+      setError('File size must be less than 1gb');
       return;
     }
 
@@ -110,7 +110,7 @@ const AdminUpload = () => {
       // Navigate to posts page after success
       setTimeout(() => {
         navigate('/admin/posts');
-      }, 1500);
+      }, 600000);
     } catch (err) {
       console.error('Upload error:', err);
       setError(err.response?.data?.message || 'Failed to upload content');
