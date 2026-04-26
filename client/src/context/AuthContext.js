@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
       const currentToken = localStorage.getItem('token');
       if (currentToken) {
         try {
-          const response = await axios.get('/users/profile');
+      const response = await axios.get('/auth/profile');
           setUser(response.data);
         } catch (error) {
           console.error('Auth check failed:', error);
@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
   // User login
   const login = async (email, password) => {
     try {
-      const response = await axios.post('/users/login', { 
+      const response = await axios.post('/auth/login', { 
         username: email.includes('@') ? undefined : email,
         email: email.includes('@') ? email : undefined, 
         password 
@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await axios.post('/users/register', userData);
+      const response = await axios.post('/auth/register', userData);
       setToken(response.data.token);
       setUser(response.data.user);
       return { success: true, message: response.data.message };
@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateUserProfile = async (data) => {
     try {
-      const response = await axios.put('/users/profile', data);
+      const response = await axios.put('/auth/update-profile', data);
       setUser(response.data.user);
       return { success: true, message: response.data.message };
     } catch (error) {

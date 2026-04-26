@@ -35,9 +35,10 @@ const BASE_URL = process.env.API_BASE_URL || 'https://boost-art-backend.onrender
 // Middleware
 // =======================
 app.use(cors({
-  origin: '*',
+  origin: process.env.FRONTEND_URL || 'https://boost-art-drab.vercel.app',
   methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'multipart/form-data']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'multipart/form-data'],
+  credentials: true
 }));
 
 app.use(express.json({ limit: "10mb" }));
@@ -80,9 +81,22 @@ const upload = multer({
 });
 
 // =======================
+// Validate Required Env Vars
+// =======================
+if (process.env.NODE_ENV === 'production' && !process.env.MONGO_URI) {
+  console.error('❌ MONGO_URI environment variable is required in production');
+  process.exit(1);
+}
+
+// =======================
 // MongoDB Connection
 // =======================
-mongoose.connect(process.env.MONGO_URI)
+const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/boostart';
+if (!process.env.MONGO_URI) {
+  console.warn('⚠️  MONGO_URI not set, falling back to local MongoDB');
+}
+
+mongoose.connect(mongoUri)
   .then(async () => {
     console.log("✅ MongoDB Connected Successfully");
 
@@ -242,7 +256,11 @@ app.use((req, res) => {
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { 
+    origin: process.env.FRONTEND_URL || 'https://boost-art-drab.vercel.app',
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
   pingTimeout: 60000,
   pingInterval: 25000
 });

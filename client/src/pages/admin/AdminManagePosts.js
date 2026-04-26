@@ -35,7 +35,7 @@ const AdminManagePosts = () => {
 
   const handleDelete = async (postId) => {
     try {
-      await axios.delete(`admin/posts/${postId}`);
+      await axios.delete(`/admin/posts/${postId}`);
       setPosts(posts.filter(post => post._id !== postId));
       setDeleteConfirm(null);
     } catch (err) {
@@ -89,7 +89,7 @@ const AdminManagePosts = () => {
         data.append('media', editFile);
       }
 
-      const response = await axios.put(`admin/posts/${editingPost._id}`, data, {
+      const response = await axios.put(`/admin/posts/${editingPost._id}`, data, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

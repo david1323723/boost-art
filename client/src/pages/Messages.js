@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
-import axios from '../api';
+import axios, { SOCKET_BASE_URL } from '../api';
 import './Messages.css';
 
 const Messages = () => {
@@ -53,7 +53,7 @@ const Messages = () => {
     if (!token || !userIdRef.current) return;
 
     const newSocket = io(
-      'https://boost-art-backend.onrender.com',
+      SOCKET_BASE_URL,
       {
         auth: { token },
         reconnection: true,

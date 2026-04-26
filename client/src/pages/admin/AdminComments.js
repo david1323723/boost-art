@@ -26,7 +26,7 @@ const AdminComments = () => {
 
   const handleDelete = async (postId, commentId) => {
     try {
-      await axios.delete(`admin/posts/${postId}/comments/${commentId}`);
+      await axios.delete(`/admin/posts/${postId}/comments/${commentId}`);
       setComments(comments.filter(c => c._id !== commentId));
     } catch (err) {
       setError('Failed to delete comment');

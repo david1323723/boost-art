@@ -8,6 +8,10 @@ require('dotenv').config();
 // MongoDB connection URI
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/boostart';
 
+if (!process.env.MONGO_URI) {
+  console.warn('⚠️  MONGO_URI not set, falling back to local MongoDB');
+}
+
 // Connect to MongoDB
 mongoose.connect(MONGO_URI)
   .then(() => {
