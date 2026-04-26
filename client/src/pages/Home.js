@@ -24,7 +24,7 @@ const Home = () => {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/users/posts');
+      const response = await axios.get('/posts');
       setPosts(response.data);
       setError('');
     } catch (err) {
