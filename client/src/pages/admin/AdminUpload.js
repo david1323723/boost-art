@@ -110,7 +110,7 @@ const AdminUpload = () => {
       // Navigate to posts page after success
       setTimeout(() => {
         navigate('/admin/posts');
-      }, 600000);
+      }, 2000);
     } catch (err) {
       console.error('Upload error:', err);
       setError(err.response?.data?.message || 'Failed to upload content');

@@ -1,34 +1,47 @@
+/**
+ * ============================================================
+ * Admin Routes — Cloudinary Edition
+ * ============================================================
+ * All media operations now go through Cloudinary instead of the
+ * local filesystem.  When a post is deleted or its media replaced
+ * we call deleteFromCloudinary() to clean up the old asset.
+ *
+ * What changed?
+ * -------------
+ * • Removed multer.diskStorage, fs, path local-file logic
+ * • Imported Cloudinary storage + delete helper from utils/cloudinary.js
+ * • DELETE /api/admin/posts/:postId  → deletes Cloudinary asset
+ * • PUT  /api/admin/posts/:postId    → replaces Cloudinary asset
+ * ============================================================
+ */
+
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Post = require("../models/Post");
 const Message = require("../models/Message");
 const { adminAuth, superAdminAuth } = require("../middleware/adminAuth");
-const path = require("path");
-const fs = require("fs");
 const multer = require("multer");
 
-// Multer setup for admin post edits
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, "..", "uploads");
-    if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
+// ------------------------------------------------------------------
+// Cloudinary-backed Multer storage (replaces local diskStorage)
+// ------------------------------------------------------------------
+const { storage, deleteFromCloudinary } = require("../utils/cloudinary");
+
+const upload = multer({
+  storage,            // <-- CloudinaryStorage instance
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB cap
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|mov|avi|webm/;
+    const extname = allowedTypes.test(
+      require("path").extname(file.originalname).toLowerCase()
+    );
+    const mimetype =
+      allowedTypes.test(file.mimetype) || file.mimetype.startsWith("video/");
+    if (extname || mimetype) cb(null, true);
+    else cb(new Error("Only images and videos are allowed"));
   }
 });
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|mov|avi|webm/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype) || file.mimetype.startsWith("video/");
-  if (extname || mimetype) cb(null, true);
-  else cb(new Error("Only images and videos are allowed"));
-};
-
-const upload = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
 
 const router = express.Router();
 
@@ -50,8 +63,8 @@ router.post("/login", async (req, res) => {
 
     if (!username || !password) {
       console.log('Missing username or password');
-      return res.status(400).json({ 
-        message: "Username and password are required" 
+      return res.status(400).json({
+        message: "Username and password are required"
       });
     }
 
@@ -60,8 +73,8 @@ router.post("/login", async (req, res) => {
 
     if (!admin) {
       console.log('Admin not found, login failed');
-      return res.status(400).json({ 
-        message: "Invalid credentials" 
+      return res.status(400).json({
+        message: "Invalid credentials"
       });
     }
 
@@ -70,14 +83,14 @@ router.post("/login", async (req, res) => {
 
     if (!isMatch) {
       console.log('Password mismatch');
-      return res.status(400).json({ 
-        message: "Invalid credentials" 
+      return res.status(400).json({
+        message: "Invalid credentials"
       });
     }
 
     if (!admin.isActive) {
-      return res.status(400).json({ 
-        message: "Admin account is deactivated" 
+      return res.status(400).json({
+        message: "Admin account is deactivated"
       });
     }
 
@@ -94,9 +107,9 @@ router.post("/login", async (req, res) => {
 
   } catch (error) {
     console.error("ADMIN LOGIN ERROR:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Login failed" 
+      message: "Login failed"
     });
   }
 });
@@ -107,7 +120,7 @@ router.post("/login", async (req, res) => {
 router.put("/update-credentials", adminAuth, async (req, res) => {
   try {
     const { username, password } = req.body;
-    
+
     const adminId = req.admin._id || req.admin.id;
     const admin = await User.findById(adminId);
     if (!admin) {
@@ -117,30 +130,30 @@ router.put("/update-credentials", adminAuth, async (req, res) => {
     // Update username if provided
     if (username && username !== admin.username) {
       if (username.length < 3) {
-        return res.status(400).json({ 
-          message: "Username must be at least 3 characters" 
+        return res.status(400).json({
+          message: "Username must be at least 3 characters"
         });
       }
-      
-      const existingAdmin = await User.findOne({ 
-        username, 
-        _id: { $ne: admin._id } 
+
+      const existingAdmin = await User.findOne({
+        username,
+        _id: { $ne: admin._id }
       });
-      
+
       if (existingAdmin) {
-        return res.status(400).json({ 
-          message: "Username already taken" 
+        return res.status(400).json({
+          message: "Username already taken"
         });
       }
-      
+
       admin.username = username;
     }
 
     // Update password if provided
     if (password) {
       if (password.length < 6) {
-        return res.status(400).json({ 
-          message: "Password must be at least 6 characters" 
+        return res.status(400).json({
+          message: "Password must be at least 6 characters"
         });
       }
       admin.password = password; // Will be hashed by pre-save hook
@@ -148,7 +161,7 @@ router.put("/update-credentials", adminAuth, async (req, res) => {
 
     await admin.save();
 
-    res.json({ 
+    res.json({
       success: true,
       message: "Credentials updated successfully",
       admin: {
@@ -160,9 +173,9 @@ router.put("/update-credentials", adminAuth, async (req, res) => {
 
   } catch (error) {
     console.error("UPDATE CREDENTIALS ERROR:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Failed to update credentials" 
+      message: "Failed to update credentials"
     });
   }
 });
@@ -206,7 +219,7 @@ router.put("/profile", adminAuth, async (req, res) => {
     Object.assign(admin, updateData);
     await admin.save();
 
-    res.json({ 
+    res.json({
       success: true,
       message: "Profile updated successfully",
       admin
@@ -229,7 +242,7 @@ router.put("/change-password", adminAuth, async (req, res) => {
 
     const admin = await User.findById(adminId);
     const isMatch = await admin.comparePassword(currentPassword);
-    
+
     if (!isMatch) {
       return res.status(400).json({ message: "Current password incorrect" });
     }
@@ -338,6 +351,9 @@ router.delete("/posts/:postId/comments/:commentId", adminAuth, async (req, res) 
 // DELETE POST
 // DELETE /api/admin/posts/:postId
 // =======================
+// Deletes the post document from MongoDB AND removes the associated
+// media asset from Cloudinary so we don't leak storage.
+// =======================
 router.delete("/posts/:postId", adminAuth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
@@ -345,17 +361,9 @@ router.delete("/posts/:postId", adminAuth, async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // Delete associated media file if it exists locally
+    // Delete associated media from Cloudinary (if any)
     if (post.mediaUrl) {
-      try {
-        const filename = path.basename(post.mediaUrl);
-        const filePath = path.join(__dirname, "..", "uploads", filename);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      } catch (fileErr) {
-        console.error("Failed to delete media file:", fileErr.message);
-      }
+      await deleteFromCloudinary(post.mediaUrl);
     }
 
     await Post.findByIdAndDelete(req.params.postId);
@@ -369,6 +377,10 @@ router.delete("/posts/:postId", adminAuth, async (req, res) => {
 // =======================
 // UPDATE POST
 // PUT /api/admin/posts/:postId
+// =======================
+// If a new media file is uploaded we:
+//   1. Delete the OLD asset from Cloudinary (cleanup)
+//   2. Save the NEW Cloudinary URL (req.file.path) to MongoDB
 // =======================
 router.put("/posts/:postId", adminAuth, upload.single("media"), async (req, res) => {
   try {
@@ -392,21 +404,13 @@ router.put("/posts/:postId", adminAuth, upload.single("media"), async (req, res)
 
     // Handle media replacement
     if (req.file) {
-      // Delete old media file
+      // 1. Delete old media from Cloudinary (cleanup)
       if (post.mediaUrl) {
-        try {
-          const oldFilename = path.basename(post.mediaUrl);
-          const oldFilePath = path.join(__dirname, "..", "uploads", oldFilename);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-          }
-        } catch (fileErr) {
-          console.error("Failed to delete old media file:", fileErr.message);
-        }
+        await deleteFromCloudinary(post.mediaUrl);
       }
 
-      const BASE_URL = process.env.API_BASE_URL || 'https://boost-art-backend.onrender.com';
-      updateData.mediaUrl = `${BASE_URL}/uploads/${req.file.filename}`;
+      // 2. Store the new Cloudinary URL returned by multer-storage-cloudinary
+      updateData.mediaUrl = req.file.path;
       updateData.mediaType = req.file.mimetype.startsWith("video/") ? "video" : "image";
     }
 
@@ -419,13 +423,10 @@ router.put("/posts/:postId", adminAuth, upload.single("media"), async (req, res)
     res.json({ message: "Post updated successfully", post: updatedPost });
   } catch (error) {
     console.error("UPDATE POST ERROR:", error);
-    if (req.file) {
-      const cleanupPath = path.join(__dirname, "..", "uploads", req.file.filename);
-      if (fs.existsSync(cleanupPath)) fs.unlinkSync(cleanupPath);
-    }
     res.status(500).json({ message: "Failed to update post" });
   }
 });
 
 // Export router
 module.exports = router;
+
