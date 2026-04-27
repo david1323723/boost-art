@@ -1,31 +1,43 @@
 /**
  * ============================================================
- * Cloudinary Configuration & Storage Helper
+ * Cloudinary Configuration & Upload Helper
  * ============================================================
- * This module configures the Cloudinary SDK and exports a
- * pre-configured Multer storage engine (multer-storage-cloudinary)
- * that uploads images and videos directly to Cloudinary.
+ * This module configures the Cloudinary SDK and provides a robust
+ * upload function that streams file buffers directly to Cloudinary.
  *
- * Why Cloudinary?
- * ---------------
- * Render's free tier uses an ephemeral filesystem. Any files saved
- * to disk (e.g. ./uploads) are wiped on every server restart or
- * redeploy. By streaming files directly to Cloudinary we guarantee
- * persistence regardless of server state.
+ * Why not use multer-storage-cloudinary?
+ * --------------------------------------
+ * multer-storage-cloudinary v4 was designed for multer v1.x.
+ * This project uses multer v2.x which has a completely rewritten
+ * internal storage API.  Using multer.memoryStorage() + an explicit
+ * upload function gives us:
  *
- * Environment variables required (set in Render dashboard or .env):
- *   CLOUDINARY_CLOUD_NAME
- *   CLOUDINARY_API_KEY
- *   CLOUDINARY_API_SECRET
+ *   • Guaranteed compatibility with any multer version
+ *   • Full try/catch error handling around the Cloudinary API call
+ *   • Zero local disk writes (Render-safe)
  * ============================================================
  */
 
 require("dotenv").config();
 const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
 // ------------------------------------------------------------------
-// 1. Configure Cloudinary SDK with credentials from environment
+// 1. Validate env vars at startup — fail fast with a clear message
+// ------------------------------------------------------------------
+const required = [
+  "CLOUDINARY_CLOUD_NAME",
+  "CLOUDINARY_API_KEY",
+  "CLOUDINARY_API_SECRET",
+];
+for (const key of required) {
+  if (!process.env[key]) {
+    console.error(`❌ MISSING ENV VAR: ${key}`);
+    console.error("   Uploads will fail until this is set in Render dashboard.");
+  }
+}
+
+// ------------------------------------------------------------------
+// 2. Configure Cloudinary SDK
 // ------------------------------------------------------------------
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -34,83 +46,65 @@ cloudinary.config({
 });
 
 // ------------------------------------------------------------------
-// 2. Create Multer storage engine backed by Cloudinary
+// 3. Upload a buffer straight to Cloudinary
 // ------------------------------------------------------------------
-// The storage engine decides *where* and *how* files are stored.
-// Instead of writing to the local disk we stream bytes directly to
-// Cloudinary's API.  The returned `req.file.path` is the secure
-// HTTPS URL we save in MongoDB.
-// ------------------------------------------------------------------
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
+/**
+ * uploadBuffer — uploads a file buffer to Cloudinary.
+ *
+ * @param {Buffer} buffer     — the file bytes from multer (memoryStorage)
+ * @param {String} mimetype   — e.g. "image/jpeg" or "video/mp4"
+ * @param {String} original   — original filename (used for public_id base)
+ *
+ * @returns {Promise<{secure_url:String, resource_type:String}>}
+ */
+const uploadBuffer = (buffer, mimetype, original) => {
+  return new Promise((resolve, reject) => {
+    const isVideo = mimetype && mimetype.startsWith("video/");
+    const resource_type = isVideo ? "video" : "image";
 
-  params: async (req, file) => {
-    // Detect resource type from MIME type so Cloudinary handles
-    // images and videos correctly (different pipelines, transforms,
-    // and delivery URLs).
-    const isVideo = file.mimetype.startsWith("video/");
+    // Build a sanitised public_id from timestamp + original name
+    const safeName = original
+      ? original.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_")
+      : "upload";
+    const public_id = `boostart/${Date.now()}-${safeName}`;
 
-    return {
-      folder: "boostart",                 // Organise uploads in one folder
-      resource_type: isVideo ? "video" : "image",
-      allowed_formats: isVideo
-        ? ["mp4", "mov", "avi", "webm"]
-        : ["jpg", "jpeg", "png", "gif", "webp"],
-      // Cloudinary public_id is derived from the original filename
-      // (sanitised automatically by the SDK).
-      public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
+    const uploadOpts = {
+      resource_type,
+      public_id,
+      folder: "boostart",
     };
-  },
-});
+
+    // Use Cloudinary's upload_stream wrapper for buffers
+    const stream = cloudinary.uploader.upload_stream(
+      uploadOpts,
+      (error, result) => {
+        if (error) {
+          console.error("Cloudinary upload_stream error:", error);
+          return reject(error);
+        }
+        resolve({
+          secure_url: result.secure_url,
+          resource_type: result.resource_type,
+        });
+      }
+    );
+
+    stream.end(buffer);
+  });
+};
 
 // ------------------------------------------------------------------
-// 3. Helper: delete a media asset from Cloudinary by its URL
-// ------------------------------------------------------------------
-// When a post is deleted or its media is replaced we must also
-// remove the asset from Cloudinary so we do not leak storage.
-// This function extracts the public_id from a standard Cloudinary
-// URL and calls the destroy API with the correct resource_type.
+// 4. Delete an asset from Cloudinary by its URL
 // ------------------------------------------------------------------
 const deleteFromCloudinary = async (url) => {
   if (!url || typeof url !== "string") return;
 
   try {
-    // Typical URL shape:
-    // https://res.cloudinary.com/<cloud>/image/upload/v1234567890/boostart/123-file.jpg
-    // We need the portion after `/upload/` (or `/upload/v123/`) → "boostart/123-file"
     const parsed = new URL(url);
     const segments = parsed.pathname.split("/");
 
-    // Find the index of "upload" and grab everything after it
     const uploadIdx = segments.indexOf("upload");
     if (uploadIdx === -1) return;
 
-    // Remove optional version segment (e.g. v1234567890)
     let afterUpload = segments.slice(uploadIdx + 1);
-    if (afterUpload[0] && afterUpload[0].startsWith("v")) {
-      afterUpload.shift();
-    }
-
-    // Re-join and strip extension to get public_id
-    const publicIdWithExt = afterUpload.join("/");
-    const publicId = publicIdWithExt.replace(/\.[^/.]+$/, ""); // remove extension
-
-    if (!publicId) return;
-
-    // Determine resource_type from URL path (image or video)
-    const resourceType = parsed.pathname.includes("/video/") ? "video" : "image";
-
-    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
-    console.log(`☁️  Deleted from Cloudinary: ${publicId} (${resourceType})`);
-  } catch (err) {
-    console.error("Cloudinary delete error:", err.message);
-    // Non-fatal: do not throw so post delete/update still succeeds
-  }
-};
-
-module.exports = {
-  cloudinary,
-  storage,
-  deleteFromCloudinary,
-};
-
+    if (afterUpload[0] && afterUpload[0].startsWith

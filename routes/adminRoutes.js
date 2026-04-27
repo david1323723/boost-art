@@ -1,17 +1,13 @@
 /**
  * ============================================================
- * Admin Routes — Cloudinary Edition
+ * Admin Routes — Cloudinary Edition (Robust)
  * ============================================================
- * All media operations now go through Cloudinary instead of the
- * local filesystem.  When a post is deleted or its media replaced
- * we call deleteFromCloudinary() to clean up the old asset.
+ * All media operations now go through Cloudinary via direct SDK
+ * upload. Multer memoryStorage buffers the file; we then call
+ * cloudinary.uploader.upload() with the buffer stream.
  *
- * What changed?
- * -------------
- * • Removed multer.diskStorage, fs, path local-file logic
- * • Imported Cloudinary storage + delete helper from utils/cloudinary.js
- * • DELETE /api/admin/posts/:postId  → deletes Cloudinary asset
- * • PUT  /api/admin/posts/:postId    → replaces Cloudinary asset
+ * This replaces the flaky multer-storage-cloudinary integration
+ * with explicit, fully error-handled Cloudinary calls.
  * ============================================================
  */
 
@@ -21,27 +17,10 @@ const User = require("../models/User");
 const Post = require("../models/Post");
 const Message = require("../models/Message");
 const { adminAuth, superAdminAuth } = require("../middleware/adminAuth");
-const multer = require("multer");
 
-// ------------------------------------------------------------------
-// Cloudinary-backed Multer storage (replaces local diskStorage)
-// ------------------------------------------------------------------
-const { storage, deleteFromCloudinary } = require("../utils/cloudinary");
-
-const upload = multer({
-  storage,            // <-- CloudinaryStorage instance
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB cap
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|mov|avi|webm/;
-    const extname = allowedTypes.test(
-      require("path").extname(file.originalname).toLowerCase()
-    );
-    const mimetype =
-      allowedTypes.test(file.mimetype) || file.mimetype.startsWith("video/");
-    if (extname || mimetype) cb(null, true);
-    else cb(new Error("Only images and videos are allowed"));
-  }
-});
+// Cloudinary helpers + multer memory storage wrapper
+const { uploadToCloudinary, deleteFromCloudinary } = require("../utils/cloudinary");
+const { uploadFile } = require("../utils/multer-memory-upload");
 
 const router = express.Router();
 
@@ -380,9 +359,10 @@ router.delete("/posts/:postId", adminAuth, async (req, res) => {
 // =======================
 // If a new media file is uploaded we:
 //   1. Delete the OLD asset from Cloudinary (cleanup)
-//   2. Save the NEW Cloudinary URL (req.file.path) to MongoDB
+//   2. Upload the NEW file buffer to Cloudinary
+//   3. Save the returned Cloudinary URL in MongoDB
 // =======================
-router.put("/posts/:postId", adminAuth, upload.single("media"), async (req, res) => {
+router.put("/posts/:postId", adminAuth, uploadFile, async (req, res) => {
   try {
     const { title, description, category } = req.body;
     const post = await Post.findById(req.params.postId);
@@ -409,8 +389,11 @@ router.put("/posts/:postId", adminAuth, upload.single("media"), async (req, res)
         await deleteFromCloudinary(post.mediaUrl);
       }
 
-      // 2. Store the new Cloudinary URL returned by multer-storage-cloudinary
-      updateData.mediaUrl = req.file.path;
+      // 2. Upload new buffer to Cloudinary
+      const uploadResult = await uploadToCloudinary(req.file);
+
+      // 3. Store new Cloudinary URL
+      updateData.mediaUrl = uploadResult.secure_url;
       updateData.mediaType = req.file.mimetype.startsWith("video/") ? "video" : "image";
     }
 
@@ -423,7 +406,7 @@ router.put("/posts/:postId", adminAuth, upload.single("media"), async (req, res)
     res.json({ message: "Post updated successfully", post: updatedPost });
   } catch (error) {
     console.error("UPDATE POST ERROR:", error);
-    res.status(500).json({ message: "Failed to update post" });
+    res.status(500).json({ message: error.message || "Failed to update post" });
   }
 });
 

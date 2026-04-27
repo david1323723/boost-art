@@ -1,18 +1,15 @@
 /**
  * ============================================================
- * BoostArt Server — Cloudinary Edition
+ * BoostArt Server — Cloudinary Edition (Robust)
  * ============================================================
- * All media (images + videos) are streamed directly to Cloudinary
- * via multer-storage-cloudinary.  Nothing is ever written to the
- * local disk, which makes the backend completely stateless and
- * immune to Render's ephemeral filesystem.
+ * All media is uploaded to Cloudinary via direct SDK call.
+ * Multer stores files temporarily in RAM (memoryStorage) and we
+ * immediately upload the buffer to Cloudinary.
  *
- * What changed?
- * -------------
- * • Removed multer.diskStorage, express.static('uploads'), fs, path
- * • Imported Cloudinary storage from utils/cloudinary.js
- * • POST /api/posts now uses req.file.path (Cloudinary URL)
- * • mediaType is inferred from the uploaded file's MIME type
+ * This approach:
+ *   • Works reliably with any version of multer
+ *   • Captures upload errors explicitly
+ *   • Does NOT depend on local filesystem or express.static
  * ============================================================
  */
 
@@ -22,7 +19,6 @@ const cors = require("cors");
 const multer = require("multer");
 const http = require("http");
 const { Server } = require("socket.io");
-const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 // Models
@@ -41,10 +37,9 @@ const userRoutes = require("./routes/userRoutes");
 const authRoutes = require("./routes/auth");
 const adminRoutes = require("./routes/adminRoutes");
 
-// ------------------------------------------------------------------
-// Cloudinary-backed Multer storage (replaces local diskStorage)
-// ------------------------------------------------------------------
-const { storage } = require("./utils/cloudinary");
+// Cloudinary helpers
+const { uploadToCloudinary, deleteFromCloudinary } = require("./utils/cloudinary");
+const { uploadFile } = require("./utils/multer-memory-upload");
 
 const app = express();
 
@@ -86,23 +81,6 @@ app.use(cors(corsOptions));
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// ❌ REMOVED: local static file serving — all media now lives on Cloudinary
-// app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-
-// =======================
-// Multer Setup (Cloudinary)
-// =======================
-// We use the CloudinaryStorage engine imported above.  Files are
-// streamed straight to Cloudinary; req.file.path contains the
-// secure HTTPS URL that we persist in MongoDB.
-// =======================
-
-const upload = multer({
-  storage,            // <-- CloudinaryStorage instance
-  limits: { fileSize: 100 * 1024 * 1024 } // 100 MB cap
-});
 
 
 // =======================
@@ -191,52 +169,36 @@ app.use("/api/messages", require("./routes/messageRoutes"));
 // =======================
 // CREATE POST
 // =======================
-// Streams the uploaded file directly to Cloudinary.
-// req.file is populated by Multer + CloudinaryStorage.
-// req.file.path  → secure Cloudinary URL (e.g. https://res.cloudinary.com/...)
-// req.file.mimetype → "image/jpeg" or "video/mp4" etc.
+// 1. multer.memoryStorage() buffers the file in req.file.buffer
+// 2. uploadToCloudinary() uploads the buffer to Cloudinary
+// 3. MongoDB stores only the returned Cloudinary URL
 // =======================
 
 app.post(
   "/api/posts",
   adminAuth,
-  upload.single("image"),   // field name matches frontend FormData key
+  uploadFile,                          // <-- multer memoryStorage
   async (req, res) => {
-
     try {
-
-      const {
-        title,
-        description,
-        category
-      } = req.body;
+      const { title, description, category } = req.body;
 
       if (!req.file) {
-
-        return res
-          .status(400)
-          .json({ message: "Upload file required" });
-
+        return res.status(400).json({ message: "Upload file required" });
       }
 
-      // CloudinaryStorage returns the secure HTTPS URL in req.file.path
-      const mediaUrl = req.file.path;
+      // Upload buffer to Cloudinary (images + videos both supported)
+      const uploadResult = await uploadToCloudinary(req.file);
 
-      // Derive mediaType from the file's MIME type
+      const mediaUrl = uploadResult.secure_url;
       const mediaType = req.file.mimetype.startsWith("video/") ? "video" : "image";
 
       const newPost = new Post({
-
         title,
         description,
         category,
-
-        mediaUrl,    // <-- stored in MongoDB: only the Cloudinary URL
-        mediaType,   // <-- "image" or "video"
-
-        uploadedBy:
-          req.admin._id
-
+        mediaUrl,     // <-- Cloudinary URL stored in MongoDB
+        mediaType,
+        uploadedBy: req.admin._id
       });
 
       await newPost.save();
@@ -247,17 +209,11 @@ app.post(
       });
 
     } catch (err) {
-
       console.error("POST ERROR:", err);
-
-      res
-        .status(500)
-        .json({
-          message: "Post failed"
-        });
-
+      res.status(500).json({
+        message: err.message || "Post failed"
+      });
     }
-
   }
 );
 
@@ -324,7 +280,8 @@ const io =
     }
 
   });
-  app.use(express.json({ limit: "1gb" }));
+
+app.use(express.json({ limit: "1gb" }));
 app.use(express.urlencoded({ extended: true, limit: "1gb" }));
 
 
